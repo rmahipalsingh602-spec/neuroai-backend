@@ -1,0 +1,117 @@
+from datetime import date, datetime
+from typing import List
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if "@" not in email or "." not in email.split("@")[-1]:
+            raise ValueError("Enter a valid email address")
+        return email
+
+
+class UserSummary(BaseModel):
+    id: int
+    email: str
+    is_pro: bool
+    usage_count: int
+    usage_limit: int
+    remaining_queries: int
+    usage_month: date
+    created_at: datetime
+    document_count: int
+    payment_count: int
+    is_admin: bool
+    has_seen_onboarding: bool
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserSummary
+
+
+class DocumentSummary(BaseModel):
+    id: int
+    file_name: str
+    content_preview: str
+    created_at: datetime
+
+
+class DocumentListResponse(BaseModel):
+    documents: List[DocumentSummary]
+
+
+class UploadResponse(BaseModel):
+    message: str
+    document: DocumentSummary
+    accepted_types: List[str]
+
+
+class ChatRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=4000)
+
+
+class ChatSource(BaseModel):
+    document_id: int
+    file_name: str
+    excerpt: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    sources: List[ChatSource]
+    user: UserSummary
+
+
+class CreateOrderResponse(BaseModel):
+    order_id: str
+    amount: int
+    currency: str
+    key_id: str
+    plan_name: str
+    is_mock: bool
+
+
+class PaymentVerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+class PaymentVerifyResponse(BaseModel):
+    message: str
+    user: UserSummary
+
+
+class AdminUserSummary(BaseModel):
+    id: int
+    email: str
+    is_pro: bool
+    usage_count: int
+    created_at: datetime
+
+
+class PaymentSummary(BaseModel):
+    id: int
+    user_id: int
+    amount: int
+    status: str
+    provider_order_id: str
+    provider_payment_id: str | None = None
+    created_at: datetime
+
+
+class AdminOverview(BaseModel):
+    total_users: int
+    pro_users: int
+    total_revenue: int
+    users: List[AdminUserSummary]
+    payments: List[PaymentSummary]
