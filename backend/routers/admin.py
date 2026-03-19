@@ -2,10 +2,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..auth import require_admin
-from ..database import get_db
-from ..models import Payment, User
-from ..schemas import AdminOverview, AdminUserSummary, PaymentSummary
+try:
+    from auth import require_admin
+    from database import get_db
+    from models import Payment, User
+    from schemas import AdminOverview, AdminUserSummary, PaymentSummary
+except ImportError:  # pragma: no cover - package import fallback
+    from ..auth import require_admin
+    from ..database import get_db
+    from ..models import Payment, User
+    from ..schemas import AdminOverview, AdminUserSummary, PaymentSummary
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

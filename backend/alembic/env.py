@@ -2,8 +2,12 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-from backend.database import Base
-from backend.models import *
+try:
+    from database import Base
+    from models import *
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.database import Base
+    from backend.models import *
 
 # this is the Alembic Config object
 import os

@@ -8,10 +8,16 @@ import requests
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..config import settings
-from ..errors import api_error
-from ..models import Payment, User
-from ..schemas import PaymentVerifyRequest
+try:
+    from config import settings
+    from errors import api_error
+    from models import Payment, User
+    from schemas import PaymentVerifyRequest
+except ImportError:  # pragma: no cover - package import fallback
+    from ..config import settings
+    from ..errors import api_error
+    from ..models import Payment, User
+    from ..schemas import PaymentVerifyRequest
 
 
 def create_payment_order(db: Session, user: User) -> tuple[Payment, dict]:

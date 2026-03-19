@@ -2,7 +2,10 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from .config import settings
+try:
+    from config import settings
+except ImportError:  # pragma: no cover - package import fallback
+    from .config import settings
 
 engine_kwargs = {"pool_pre_ping": True}
 

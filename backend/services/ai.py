@@ -12,8 +12,12 @@ try:
 except ImportError:  # pragma: no cover
     OpenAI = None
 
-from ..config import settings
-from ..models import Document
+try:
+    from config import settings
+    from models import Document
+except ImportError:  # pragma: no cover - package import fallback
+    from ..config import settings
+    from ..models import Document
 
 MAX_CONTEXT_CHUNKS = 4
 MAX_CHUNK_WORDS = 180

@@ -3,7 +3,10 @@ from datetime import date, datetime
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
-from .database import Base
+try:
+    from database import Base
+except ImportError:  # pragma: no cover - package import fallback
+    from .database import Base
 
 
 def current_usage_month() -> date:

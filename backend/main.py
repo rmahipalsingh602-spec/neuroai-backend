@@ -6,10 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from .config import settings
-from .database import Base, engine, ensure_schema_compatibility
-from .errors import api_error
-from .routers import admin, auth, chat, payments, upload
+try:
+    from config import settings
+    from database import Base, engine, ensure_schema_compatibility
+    from errors import api_error
+    from routers import admin, auth, chat, payments, upload
+except ImportError:  # pragma: no cover - package import fallback
+    from .config import settings
+    from .database import Base, engine, ensure_schema_compatibility
+    from .errors import api_error
+    from .routers import admin, auth, chat, payments, upload
 
 app = FastAPI(title=settings.app_name)
 
