@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -6,16 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-try:
-    from config import settings
-    from database import Base, engine, ensure_schema_compatibility
-    from errors import api_error
-    from routers import admin, auth, chat, payments, upload
-except ImportError:  # pragma: no cover - package import fallback
-    from .config import settings
-    from .database import Base, engine, ensure_schema_compatibility
-    from .errors import api_error
-    from .routers import admin, auth, chat, payments, upload
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    # Keep `uvicorn main:app` working when the current directory is `backend/`.
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.config import settings
+from backend.database import Base, engine, ensure_schema_compatibility
+from backend.errors import api_error
+from backend.routers import admin, auth, chat, payments, upload
 
 app = FastAPI(title=settings.app_name)
 

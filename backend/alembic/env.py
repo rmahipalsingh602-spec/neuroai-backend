@@ -1,16 +1,20 @@
+import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
+
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-try:
-    from database import Base
-    from models import *
-except ImportError:  # pragma: no cover - package import fallback
-    from backend.database import Base
-    from backend.models import *
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.database import Base
+from backend.models import *
 
 # this is the Alembic Config object
-import os
 config = context.config
 config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/neuroai"))
 

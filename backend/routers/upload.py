@@ -1,20 +1,12 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-try:
-    from auth import get_current_user
-    from database import get_db
-    from errors import api_error
-    from models import Document, User
-    from schemas import DocumentListResponse, DocumentSummary, UploadResponse
-    from services.documents import extract_text_from_file, get_allowed_extensions, store_upload_file
-except ImportError:  # pragma: no cover - package import fallback
-    from ..auth import get_current_user
-    from ..database import get_db
-    from ..errors import api_error
-    from ..models import Document, User
-    from ..schemas import DocumentListResponse, DocumentSummary, UploadResponse
-    from ..services.documents import extract_text_from_file, get_allowed_extensions, store_upload_file
+from backend.auth import get_current_user
+from backend.database import get_db
+from backend.errors import api_error
+from backend.models import Document, User
+from backend.schemas import DocumentListResponse, DocumentSummary, UploadResponse
+from backend.services.documents import extract_text_from_file, get_allowed_extensions, store_upload_file
 
 router = APIRouter()
 

@@ -1,20 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-try:
-    from auth import authenticate_user, create_access_token, get_current_user, get_password_hash
-    from database import get_db
-    from errors import api_error
-    from models import User
-    from schemas import AuthRequest, AuthResponse, UserSummary
-    from services.usage import build_user_summary, refresh_usage_if_needed
-except ImportError:  # pragma: no cover - package import fallback
-    from ..auth import authenticate_user, create_access_token, get_current_user, get_password_hash
-    from ..database import get_db
-    from ..errors import api_error
-    from ..models import User
-    from ..schemas import AuthRequest, AuthResponse, UserSummary
-    from ..services.usage import build_user_summary, refresh_usage_if_needed
+from backend.auth import authenticate_user, create_access_token, get_current_user, get_password_hash
+from backend.database import get_db
+from backend.errors import api_error
+from backend.models import User
+from backend.schemas import AuthRequest, AuthResponse, UserSummary
+from backend.services.usage import build_user_summary, refresh_usage_if_needed
 
 router = APIRouter()
 

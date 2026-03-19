@@ -8,16 +8,10 @@ from jose import JWTError, jwt
 from passlib.hash import pbkdf2_sha256
 from sqlalchemy.orm import Session
 
-try:
-    from config import settings
-    from database import get_db
-    from errors import api_error
-    from models import User
-except ImportError:  # pragma: no cover - package import fallback
-    from .config import settings
-    from .database import get_db
-    from .errors import api_error
-    from .models import User
+from backend.config import settings
+from backend.database import get_db
+from backend.errors import api_error
+from backend.models import User
 
 ALGORITHM = "HS256"
 

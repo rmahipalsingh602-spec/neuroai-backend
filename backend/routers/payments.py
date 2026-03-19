@@ -1,22 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-try:
-    from auth import get_current_user
-    from database import get_db
-    from errors import api_error
-    from models import Payment, User
-    from schemas import CreateOrderResponse, PaymentVerifyRequest, PaymentVerifyResponse
-    from services.payments import create_payment_order, verify_payment_signature
-    from services.usage import build_user_summary
-except ImportError:  # pragma: no cover - package import fallback
-    from ..auth import get_current_user
-    from ..database import get_db
-    from ..errors import api_error
-    from ..models import Payment, User
-    from ..schemas import CreateOrderResponse, PaymentVerifyRequest, PaymentVerifyResponse
-    from ..services.payments import create_payment_order, verify_payment_signature
-    from ..services.usage import build_user_summary
+from backend.auth import get_current_user
+from backend.database import get_db
+from backend.errors import api_error
+from backend.models import Payment, User
+from backend.schemas import CreateOrderResponse, PaymentVerifyRequest, PaymentVerifyResponse
+from backend.services.payments import create_payment_order, verify_payment_signature
+from backend.services.usage import build_user_summary
 
 router = APIRouter()
 

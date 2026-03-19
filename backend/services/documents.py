@@ -16,10 +16,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     DocxDocument = None
 
-try:
-    from config import settings
-except ImportError:  # pragma: no cover - package import fallback
-    from ..config import settings
+from backend.config import settings
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 

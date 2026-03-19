@@ -3,16 +3,10 @@ from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-try:
-    from config import settings
-    from errors import api_error
-    from models import User
-    from schemas import UserSummary
-except ImportError:  # pragma: no cover - package import fallback
-    from ..config import settings
-    from ..errors import api_error
-    from ..models import User
-    from ..schemas import UserSummary
+from backend.config import settings
+from backend.errors import api_error
+from backend.models import User
+from backend.schemas import UserSummary
 
 
 def current_usage_month() -> date:

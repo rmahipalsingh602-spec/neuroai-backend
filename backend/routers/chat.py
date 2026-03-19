@@ -4,22 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-try:
-    from auth import get_current_user
-    from database import get_db
-    from errors import api_error
-    from models import ChatMessage, Document, User
-    from schemas import ChatRequest, ChatResponse, ChatSource
-    from services.ai import answer_question
-    from services.usage import build_user_summary, ensure_query_allowed, increment_usage, refresh_usage_if_needed
-except ImportError:  # pragma: no cover - package import fallback
-    from ..auth import get_current_user
-    from ..database import get_db
-    from ..errors import api_error
-    from ..models import ChatMessage, Document, User
-    from ..schemas import ChatRequest, ChatResponse, ChatSource
-    from ..services.ai import answer_question
-    from ..services.usage import build_user_summary, ensure_query_allowed, increment_usage, refresh_usage_if_needed
+from backend.auth import get_current_user
+from backend.database import get_db
+from backend.errors import api_error
+from backend.models import ChatMessage, Document, User
+from backend.schemas import ChatRequest, ChatResponse, ChatSource
+from backend.services.ai import answer_question
+from backend.services.usage import build_user_summary, ensure_query_allowed, increment_usage, refresh_usage_if_needed
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
