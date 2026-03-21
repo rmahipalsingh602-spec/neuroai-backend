@@ -59,6 +59,27 @@ class ChatRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
 
 
+class VoiceRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=3000)
+    target_lang: str = Field(default="hi")
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        text = " ".join(value.split()).strip()
+        if not text:
+            raise ValueError("Text is required")
+        return text
+
+    @field_validator("target_lang")
+    @classmethod
+    def validate_target_lang(cls, value: str) -> str:
+        target_lang = value.strip().lower()
+        if target_lang not in {"hi", "en", "fr", "es"}:
+            raise ValueError("target_lang must be one of: hi, en, fr, es")
+        return target_lang
+
+
 class ChatSource(BaseModel):
     document_id: int
     file_name: str

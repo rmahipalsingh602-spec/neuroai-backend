@@ -9,6 +9,14 @@ def _parse_csv(value: str, default: list[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _default_voice_temp_path() -> str:
+    if os.getenv("VOICE_TEMP_PATH"):
+        return os.getenv("VOICE_TEMP_PATH", "./uploads/voice-temp")
+    if os.getenv("RENDER") == "true" or os.getenv("RENDER_SERVICE_ID"):
+        return "/tmp/voice-temp"
+    return "./uploads/voice-temp"
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "NeuroAI Pro")
@@ -17,8 +25,23 @@ class Settings:
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
     free_monthly_queries: int = int(os.getenv("FREE_MONTHLY_QUERIES", "10"))
     uploads_path: Path = Path(os.getenv("UPLOADS_PATH", "./uploads"))
+    voice_temp_path: Path = Path(_default_voice_temp_path())
     cors_origins: list[str] = tuple(
-        _parse_csv(os.getenv("CORS_ORIGINS", ""), ["http://localhost:5173"])
+        _parse_csv(
+            os.getenv("CORS_ORIGINS", ""),
+            [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:4173",
+                "http://127.0.0.1:4173",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ],
+        )
+    )
+    cors_origin_regex: str = os.getenv(
+        "CORS_ORIGIN_REGEX",
+        r"^https://.*$",
     )
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")

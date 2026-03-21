@@ -15,13 +15,14 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.config import settings
 from backend.database import Base, engine, ensure_schema_compatibility
 from backend.errors import api_error
-from backend.routers import admin, auth, chat, payments, upload
+from backend.routers import admin, auth, chat, payments, upload, voice
 
 app = FastAPI(title=settings.app_name)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,12 +31,14 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 ensure_schema_compatibility()
 settings.uploads_path.mkdir(parents=True, exist_ok=True)
+settings.voice_temp_path.mkdir(parents=True, exist_ok=True)
 
 app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(chat.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
+app.include_router(voice.router)
 
 uploads_dir = Path(settings.uploads_path)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")

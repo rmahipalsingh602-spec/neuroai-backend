@@ -8,3 +8,6 @@ python-jose
 passlib[bcrypt]
 sqlalchemy
 openai
+gTTS
+langdetect
+googletrans==4.0.0-rc1
