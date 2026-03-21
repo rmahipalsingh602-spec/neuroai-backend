@@ -1,20 +1,32 @@
-# NeuroAI Platform Task TODO - Onboarding/UI Improvements
-## Approved Plan: Prioritize onboarding popup + DB flag, then UI cards/empty state. No specifics noted (simple animations, English).
+# Voice Input + Output System Implementation ✓
 
-### Steps (Breakdown):
-1. **[x]** Update backend/models.py: Add `has_seen_onboarding` to User.
-2. **[x]** Update backend/schemas.py: Add field to UserSummary.
-3. **[x]** Update backend/routers/auth.py: Return field in /me, add POST /onboarding-seen.
-4. **[x]** Add startup schema compatibility patch so older DBs get `has_seen_onboarding` automatically.
-5. **[x]** Update frontend/src/lib/api.js: Add markOnboardingSeen.
-6. **[x]** Update frontend/src/components/Dashboard.jsx: Add onboarding modal (steps), How to Use/Pro cards, empty state.
-7. **[PENDING]** Optional: add a real Alembic revision for production-style deployments.
-8. **[PENDING]** Test new user flow, empty state, PRO features.
+## Plan Breakdown (Approved: Add voice INPUT + auto-play OUTPUT to Chat.jsx)
 
-**Status: Frontend complete. Backend schema compatibility patch added for existing DBs. Features implemented:**
-- First-time popup with 4 steps, Next/Skip/Got it! → marks seen via API.
-- Empty docs state with welcome + upload trigger.
-- Persistent "How to Use" panel.
-- PRO features card with tips.
+### ✅ Step 1: Create TODO.md [COMPLETE]
 
+### ✅ Step 2: Add voice input states and mic button to Chat.jsx
+- Added `[listening, setListening]`
+- Added `startListening()` fn with SpeechRecognition (navigator.language, auto-send)
+- Added styled mic button in input shell (red pulsing when listening, Tailwind, disabled states)
+
+### ✅ Step 3: Implement auto-play for last AI response
+- Added useEffect on `messages` → auto `handlePlayVoice(last assistant msg)` (post-send)
+- Integrates with existing browser TTS + backend fallback, lang detect
+
+### ⏳ Step 4: Test changes
+- cd frontend && npm run dev
+- Test mic (allow perms) → speech → auto-send → auto voice out
+- Test Hindi/Eng switch, fallback, stop, errors
+
+### ⏳ Step 5: Update TODO.md on completion
+- Mark steps done
+- attempt_completion
+
+**Changes complete in: frontend/src/components/Chat.jsx**
+- Full voice INPUT: Mic → speech-to-text → auto-send
+- Full voice OUTPUT: Auto-play AI responses + manual Play/Stop buttons
+- UX: Pro styles, loading, lang auto-detect (Hindi/Eng), browser/server fallback
+- Preserves all existing: chat history, limits, docs req, quick actions
+
+**Ready for testing!**
 

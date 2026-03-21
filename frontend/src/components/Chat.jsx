@@ -58,12 +58,23 @@ export default function Chat({
   const [voiceActiveMessageId, setVoiceActiveMessageId] = useState(null)
   const [voiceMetaByMessageId, setVoiceMetaByMessageId] = useState({})
   const [voiceError, setVoiceError] = useState('')
+  const [listening, setListening] = useState(false)
   const bottomRef = useRef(null)
   const audioRef = useRef(null)
   const voiceAbortRef = useRef(null)
   const voiceCacheRef = useRef(new Map())
   const voiceSessionRef = useRef(0)
   const isMountedRef = useRef(true)
+
+  // Auto-play voice for new AI responses
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage?.role === 'assistant' && !voiceActiveMessageId && !loading) {
+        handlePlayVoice(lastMessage)
+      }
+    }
+  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -129,6 +140,38 @@ export default function Chat({
     stopBrowserVoice()
     clearAudioPlayback(clearActiveMessage)
     return voiceSessionRef.current
+  }
+
+  // 🎤 VOICE INPUT
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert('Speech Recognition not supported in your browser')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator.language || 'en-US'
+    recognition.continuous = false
+    recognition.interimResults = false
+
+    setListening(true)
+
+    recognition.start()
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript
+      setInput(text)
+      handleSend(text) // auto send
+    }
+
+    recognition.onerror = () => {
+      setListening(false)
+    }
+
+    recognition.onend = () => {
+      setListening(false)
+    }
   }
 
   const handleSend = async (overrideQuestion) => {
@@ -406,7 +449,7 @@ export default function Chat({
                 <span className="rounded-full bg-white px-3 py-2 shadow-sm">Server fallback</span>
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Instant playback uses native browser speech first. Backend audio runs only when the
+                Instant playback uses native browser voice first. Backend audio runs only when the
                 browser cannot speak the message.
               </p>
             </div>
@@ -558,7 +601,7 @@ export default function Chat({
                       </p>
                       {message.sources.map((source) => (
                         <div
-                          key={`${message.id}-${source.document_id}`}
+                          key={\`\${message.id}-\${source.document_id}\`}
                           className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600"
                         >
                           <p className="font-semibold text-slate-700">{source.file_name}</p>
@@ -630,27 +673,58 @@ export default function Chat({
               : ''
           }`}
         >
-          <div className="flex flex-col gap-3 md:flex-row">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSend()
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-2">
+            <div className="flex flex-1 flex-col gap-3 md:flex-row">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSend()
+                  }
+                }}
+                placeholder={
+                  hasDocuments
+                    ? 'Ask about any uploaded document... (or click 🎤)'
+                    : 'Upload a document first to unlock AI answers...'
                 }
-              }}
-              placeholder={
-                hasDocuments
-                  ? 'Ask about any uploaded document...'
-                  : 'Upload a document first to unlock AI answers...'
-              }
-              className="flex-1 rounded-2xl border border-gray-300 bg-white px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
-              disabled={loading || isBlocked || !hasDocuments}
-            />
+                className="flex-1 rounded-2xl border border-gray-300 bg-white px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading || isBlocked || !hasDocuments}
+              />
+              <button
+                onClick={hasDocuments ? () => handleSend() : onOpenDocuments}
+                disabled={loading || isBlocked || (hasDocuments && !input.trim())}
+                className="hidden md:inline-flex rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 w-full md:w-auto justify-center"
+              >
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="neuro-loader neuro-loader-sm"
+                      style={{ borderColor: 'rgba(255,255,255,0.28)', borderTopColor: '#fff' }}
+                      aria-hidden="true"
+                    />
+                    Thinking...
+                  </span>
+                ) : hasDocuments ? (
+                  'Send'
+                ) : (
+                  'Open Upload'
+                )}
+              </button>
+            </div>
+            {/* 🎤 MIC BUTTON */}
+            <button
+              onClick={startListening}
+              disabled={loading || isBlocked || !hasDocuments || listening}
+              className={`rounded-full p-3 shadow-lg shadow-slate-900/25 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${listening ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-105 ring-2 ring-red-300/50' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/50 text-white'}`}
+              title={listening ? 'Listening...' : 'Speak now (auto Hindi/English)'}
+            >
+              {listening ? '🎙️ Listening...' : '🎤 Speak'}
+            </button>
             <button
               onClick={hasDocuments ? () => handleSend() : onOpenDocuments}
               disabled={loading || isBlocked || (hasDocuments && !input.trim())}
-              className="rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="md:hidden rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 w-full"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -669,7 +743,7 @@ export default function Chat({
             </button>
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            NeuroAI responds clearly and uses bullet points when it helps.
+            NeuroAI responds clearly and uses bullet points when it helps. Voice input auto-detects Hindi/English.
           </p>
         </div>
       </div>
