@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Aptos, "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top, rgba(251, 191, 36, 0.16), transparent 24%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 55%, #f8fafc 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.message {
+  border-radius: 18px;
+}
+
+.neuro-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.neuro-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.neuro-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.typing-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  background: #2563eb;
+  animation: neuroai-typing 1s infinite ease-in-out;
+}
+
+.neuro-rise-in {
+  animation: neuro-rise-in 0.4s ease-out;
+}
+
+.neuro-tour-pulse {
+  animation: neuro-tour-pulse 1.8s infinite;
+}
+
+.neuro-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 3px solid rgba(148, 163, 184, 0.22);
+  border-top-color: #0f172a;
+  animation: neuro-loader-spin 0.8s linear infinite;
+}
+
+.neuro-loader-sm {
+  height: 1rem;
+  width: 1rem;
+}
+
+.neuro-loader-md {
+  height: 1.35rem;
+  width: 1.35rem;
+}
+
+.neuro-loader-lg {
+  height: 3rem;
+  width: 3rem;
+}
+
+@keyframes neuroai-typing {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes neuro-rise-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes neuro-tour-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.45);
+  }
+
+  70% {
+    box-shadow: 0 0 0 18px rgba(251, 191, 36, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+}
+
+@keyframes neuro-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

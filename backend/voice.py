@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 import uuid
@@ -9,7 +10,6 @@ from fastapi.responses import FileResponse
 from googletrans import Translator
 from gtts import gTTS
 from langdetect import DetectorFactory, LangDetectException, detect
-from starlette.background import BackgroundTask
 
 from backend.config import settings
 from backend.errors import api_error
@@ -22,6 +22,7 @@ SUPPORTED_LANGUAGES = {
     "es": "Spanish",
 }
 MAX_TEXT_LENGTH = 3000
+VOICE_CACHE_MAX_FILES = 200
 
 DetectorFactory.seed = 0
 
@@ -44,6 +45,7 @@ class VoiceResult:
     source_language: str
     output_language: str
     spoken_text: str
+    cache_hit: bool
 
 
 def detect_language(text: str) -> str:
@@ -87,17 +89,33 @@ def translate_text(text: str, target_lang: str) -> str:
     return translated_text
 
 
-def text_to_speech(text: str, lang: str) -> Path:
+def text_to_speech(text: str, lang: str) -> tuple[Path, bool]:
     normalized_text = _normalize_text(text)
     normalized_lang = _validate_target_language(lang)
 
     settings.voice_temp_path.mkdir(parents=True, exist_ok=True)
-    audio_path = settings.voice_temp_path / f"voice_{uuid.uuid4().hex}.mp3"
+    audio_path = _build_cached_audio_path(normalized_text, normalized_lang)
+    if _is_cached_audio_valid(audio_path):
+        audio_path.touch(exist_ok=True)
+        return audio_path, True
+
+    temp_path = settings.voice_temp_path / f"{audio_path.stem}_{uuid.uuid4().hex}.tmp.mp3"
 
     try:
-        gTTS(text=normalized_text, lang=normalized_lang).save(str(audio_path))
+        gTTS(text=normalized_text, lang=normalized_lang).save(str(temp_path))
+        if not _is_cached_audio_valid(temp_path):
+            raise VoiceServiceError(
+                502,
+                "TTS_ERROR",
+                f"Voice generation for {SUPPORTED_LANGUAGES[normalized_lang]} failed.",
+        )
+        temp_path.replace(audio_path)
+        _prune_voice_cache(audio_path)
+    except VoiceServiceError:
+        temp_path.unlink(missing_ok=True)
+        raise
     except Exception as exc:
-        audio_path.unlink(missing_ok=True)
+        temp_path.unlink(missing_ok=True)
         logger.exception("[VOICE] TTS generation failed for lang=%s: %s", normalized_lang, exc)
         raise VoiceServiceError(
             502,
@@ -105,7 +123,7 @@ def text_to_speech(text: str, lang: str) -> Path:
             f"Voice generation for {SUPPORTED_LANGUAGES[normalized_lang]} failed.",
         ) from exc
 
-    return audio_path
+    return audio_path, False
 
 
 def build_voice_audio(text: str, target_lang: str | None = None) -> VoiceResult:
@@ -117,13 +135,14 @@ def build_voice_audio(text: str, target_lang: str | None = None) -> VoiceResult:
         if source_language == output_language
         else translate_text(normalized_text, output_language)
     )
-    audio_path = text_to_speech(spoken_text, output_language)
+    audio_path, cache_hit = text_to_speech(spoken_text, output_language)
 
     return VoiceResult(
         audio_path=audio_path,
         source_language=source_language,
         output_language=output_language,
         spoken_text=spoken_text,
+        cache_hit=cache_hit,
     )
 
 
@@ -140,10 +159,11 @@ def generate_voice(payload: VoiceRequest):
     try:
         voice_result = build_voice_audio(payload.text, payload.target_lang)
         logger.info(
-            "[VOICE] Generated audio source_lang=%s output_lang=%s text_length=%s",
+            "[VOICE] Generated audio source_lang=%s output_lang=%s text_length=%s cache=%s",
             voice_result.source_language,
             voice_result.output_language,
             len(voice_result.spoken_text),
+            "hit" if voice_result.cache_hit else "miss",
         )
 
         return FileResponse(
@@ -154,8 +174,9 @@ def generate_voice(payload: VoiceRequest):
                 "Content-Disposition": f'inline; filename="{voice_result.audio_path.name}"',
                 "X-Source-Language": voice_result.source_language,
                 "X-Output-Language": voice_result.output_language,
+                "X-Voice-Cache": "hit" if voice_result.cache_hit else "miss",
+                "Cache-Control": "public, max-age=604800, immutable",
             },
-            background=BackgroundTask(_cleanup_file, voice_result.audio_path),
         )
     except VoiceServiceError as exc:
         log_method = logger.warning if exc.status_code < 500 else logger.exception
@@ -170,18 +191,12 @@ def generate_voice(payload: VoiceRequest):
         )
 
 
-def _cleanup_file(audio_path: Path) -> None:
-    audio_path.unlink(missing_ok=True)
-
-
 def _resolve_target_language(source_language: str, target_lang: str | None) -> str:
     if target_lang:
         return _validate_target_language(target_lang)
-    if source_language == "en":
-        return "hi"
     if source_language in SUPPORTED_LANGUAGES:
         return source_language
-    return "hi"
+    return "en"
 
 
 def _normalize_text(text: str) -> str:
@@ -222,3 +237,34 @@ def _contains_devanagari(text: str) -> bool:
 
 def _contains_basic_latin(text: str) -> bool:
     return bool(re.search(r"[A-Za-z]", text))
+
+
+def _build_cached_audio_path(text: str, lang: str) -> Path:
+    cache_key = hashlib.sha256(f"{lang}:{text}".encode("utf-8")).hexdigest()
+    return settings.voice_temp_path / f"voice_{lang}_{cache_key}.mp3"
+
+
+def _is_cached_audio_valid(audio_path: Path) -> bool:
+    try:
+        return audio_path.exists() and audio_path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _prune_voice_cache(latest_audio_path: Path) -> None:
+    try:
+        cached_audio_files = sorted(
+            settings.voice_temp_path.glob("voice_*.mp3"),
+            key=lambda cached_file: cached_file.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return
+
+    for cached_file in cached_audio_files[VOICE_CACHE_MAX_FILES:]:
+        if cached_file == latest_audio_path:
+            continue
+        try:
+            cached_file.unlink(missing_ok=True)
+        except OSError:
+            continue

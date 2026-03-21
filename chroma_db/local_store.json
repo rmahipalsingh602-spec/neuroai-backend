@@ -1,0 +1,20 @@
+{
+  "6": [
+    {
+      "id": "f9af746e-979d-408c-bf76-9ee42e1dc3af",
+      "document": "# NeuroAI Platform AI-powered private ChatGPT for companies. Upload internal PDFs, chat with RAG. ## Local Setup ### Backend ```bash python -m venv venv venv\\\\Scripts\\\\activate # Windows pip install -r backend/requirements.txt cp .env.example .env # Edit with DATABASE_URL, OPENAI_API_KEY alembic -c backend/alembic.ini upgrade head uvicorn backend.main:app --reload --port 8000 ``` You can also run from the repo root with: ```bash uvicorn main:app --reload --port 8000 ``` ### Frontend ```bash cd frontend npm install npm run dev ``` ### DB Use docker-compose up for Postgres. ## Endpoints - POST /auth/signup, /auth/login (JWT) - POST /upload/pdf (multipart file) - POST /chat/query (JSON {query}) ## Deploy - Backend+DB: Railway (postgres add-on) - Frontend: Vercel ## Tech FastAPI, React, PostgreSQL, ChromaDB, OpenAI, PyPDF2. Built by BLACKBOXAI per spec.",
+      "metadata": {
+        "filename": "README.md"
+      }
+    }
+  ],
+  "7": [
+    {
+      "id": "f45e994b-82af-413f-93b5-6862d6023daf",
+      "document": "# NeuroAI Platform AI-powered private ChatGPT for companies. Upload internal PDFs, chat with RAG. ## Local Setup ### Backend ```bash python -m venv venv venv\\\\Scripts\\\\activate # Windows pip install -r backend/requirements.txt cp .env.example .env # Edit with DATABASE_URL, OPENAI_API_KEY alembic -c backend/alembic.ini upgrade head uvicorn backend.main:app --reload --port 8000 ``` You can also run from the repo root with: ```bash uvicorn main:app --reload --port 8000 ``` ### Frontend ```bash cd frontend npm install npm run dev ``` ### DB Use docker-compose up for Postgres. ## Endpoints - POST /auth/signup, /auth/login (JWT) - POST /upload/pdf (multipart file) - POST /chat/query (JSON {query}) ## Deploy - Backend+DB: Railway (postgres add-on) - Frontend: Vercel ## Tech FastAPI, React, PostgreSQL, ChromaDB, OpenAI, PyPDF2. Built by BLACKBOXAI per spec.",
+      "metadata": {
+        "filename": "README.md"
+      }
+    }
+  ]
+}

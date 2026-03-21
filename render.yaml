@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: neuroai-backend
+    runtime: python
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: python scripts/render_prepare_requirements.py && pip install -r /tmp/requirements-render.txt && pip install --no-deps googletrans==4.0.0-rc1
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: FREE_MONTHLY_QUERIES
+        value: "10"
+      - key: UPLOADS_PATH
+        value: ./uploads
+      - key: VOICE_TEMP_PATH
+        value: /tmp/voice-temp
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
