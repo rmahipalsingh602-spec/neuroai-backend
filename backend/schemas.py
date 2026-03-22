@@ -136,3 +136,77 @@ class AdminOverview(BaseModel):
     total_revenue: int
     users: List[AdminUserSummary]
     payments: List[PaymentSummary]
+
+
+class PublicSiteReviewRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    rating: int = Field(ge=1, le=5)
+    message: str = Field(min_length=8, max_length=600)
+
+    @field_validator("name", "message")
+    @classmethod
+    def validate_public_review_text(cls, value: str) -> str:
+        text = " ".join(value.split()).strip()
+        if not text:
+            raise ValueError("This field is required")
+        return text
+
+
+class PublicSiteFeedbackRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    contact: str = Field(default="", max_length=255)
+    category: str = Field(min_length=3, max_length=50)
+    priority: str = Field(min_length=3, max_length=20)
+    message: str = Field(min_length=8, max_length=1000)
+
+    @field_validator("name", "contact", "category", "priority", "message")
+    @classmethod
+    def validate_public_feedback_text(cls, value: str) -> str:
+        return " ".join(value.split()).strip()
+
+    @field_validator("category")
+    @classmethod
+    def validate_feedback_category(cls, value: str) -> str:
+        allowed = {"bug", "feature", "improvement"}
+        category = value.lower()
+        if category not in allowed:
+            raise ValueError(f"category must be one of: {', '.join(sorted(allowed))}")
+        return category
+
+    @field_validator("priority")
+    @classmethod
+    def validate_feedback_priority(cls, value: str) -> str:
+        allowed = {"high", "medium", "low"}
+        priority = value.lower()
+        if priority not in allowed:
+            raise ValueError(f"priority must be one of: {', '.join(sorted(allowed))}")
+        return priority
+
+
+class PublicSiteReviewSummary(BaseModel):
+    id: int
+    name: str
+    rating: int
+    message: str
+    created_at: datetime
+
+
+class PublicSiteFeedbackSummary(BaseModel):
+    id: int
+    name: str
+    category: str
+    priority: str
+    message: str
+    created_at: datetime
+
+
+class PublicSiteSnapshot(BaseModel):
+    download_count: int
+    review_count: int
+    average_rating: float
+    rating_breakdown: dict[str, int]
+    feedback_count: int
+    feature_request_count: int
+    bug_report_count: int
+    latest_feedback: PublicSiteFeedbackSummary | None = None
+    reviews: List[PublicSiteReviewSummary]

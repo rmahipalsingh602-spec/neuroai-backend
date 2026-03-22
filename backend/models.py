@@ -68,3 +68,34 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="chats")
+
+
+class PublicSiteStats(Base):
+    __tablename__ = "neuroai_public_site_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    download_count = Column(Integer, default=5, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PublicSiteReview(Base):
+    __tablename__ = "neuroai_public_site_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    rating = Column(Integer, nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PublicSiteFeedback(Base):
+    __tablename__ = "neuroai_public_site_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    contact = Column(String(255), nullable=True)
+    category = Column(String(50), nullable=False, index=True)
+    priority = Column(String(20), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

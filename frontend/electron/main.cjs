@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, shell } = require('electron')
 const fs = require('fs')
 const http = require('http')
+const https = require('https')
 const path = require('path')
 
 const DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL || 'http://127.0.0.1:5173'
@@ -24,6 +25,52 @@ const MIME_TYPES = {
 let mainWindow = null
 let staticServer = null
 let appUrl = DEV_SERVER_URL
+
+function isServerReachable(urlString) {
+  return new Promise((resolve) => {
+    let settled = false
+
+    try {
+      const url = new URL(urlString)
+      const client = url.protocol === 'https:' ? https : http
+      const request = client.request(
+        {
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname || '/',
+          method: 'GET',
+          timeout: 1500,
+        },
+        (response) => {
+          if (!settled) {
+            settled = true
+            response.resume()
+            resolve(true)
+          }
+        },
+      )
+
+      request.on('timeout', () => {
+        request.destroy()
+        if (!settled) {
+          settled = true
+          resolve(false)
+        }
+      })
+
+      request.on('error', () => {
+        if (!settled) {
+          settled = true
+          resolve(false)
+        }
+      })
+
+      request.end()
+    } catch {
+      resolve(false)
+    }
+  })
+}
 
 function getMimeType(filePath) {
   return MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream'
@@ -105,11 +152,25 @@ function createStaticServer() {
 }
 
 async function resolveAppUrl() {
+  const indexPath = path.join(DIST_DIR, 'index.html')
+
   if (!app.isPackaged) {
-    return DEV_SERVER_URL
+    const devServerAvailable = await isServerReachable(DEV_SERVER_URL)
+    if (devServerAvailable) {
+      return DEV_SERVER_URL
+    }
+
+    if (!fs.existsSync(indexPath)) {
+      throw new Error(
+        'Desktop app could not find the Vite dev server or a local build. Run "npm run dev" or run "npm run build" first.',
+      )
+    }
+
+    const serverResult = await createStaticServer()
+    staticServer = serverResult.server
+    return serverResult.url
   }
 
-  const indexPath = path.join(DIST_DIR, 'index.html')
   if (!fs.existsSync(indexPath)) {
     throw new Error('Desktop build files are missing. Run "npm run build-desktop" from the frontend folder.')
   }

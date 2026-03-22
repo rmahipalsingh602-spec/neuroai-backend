@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.config import settings
 from backend.database import Base, engine, ensure_schema_compatibility
 from backend.errors import api_error
-from backend.routers import admin, auth, chat, payments, upload, voice
+from backend.routers import admin, auth, chat, payments, public_site, upload, voice
 
 app = FastAPI(title=settings.app_name)
 
@@ -39,6 +39,7 @@ app.include_router(chat.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
 app.include_router(voice.router)
+app.include_router(public_site.router)
 
 uploads_dir = Path(settings.uploads_path)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
