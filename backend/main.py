@@ -44,6 +44,10 @@ app.include_router(public_site.router)
 uploads_dir = Path(settings.uploads_path)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
+downloads_dir = PROJECT_ROOT / "downloads"
+if downloads_dir.exists():
+    app.mount("/downloads", StaticFiles(directory=downloads_dir), name="downloads")
+
 
 @app.get("/")
 def root():
