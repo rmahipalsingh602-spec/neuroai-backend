@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import Login from './components/Login.jsx'
 import Signup from './components/Signup.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import AppLayout from './components/AppLayout.jsx'
 import { getMe } from './lib/api.js'
 
 function App() {
@@ -60,16 +61,16 @@ function App() {
 
   if (booting) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#f8fafc,#eef2ff)]">
-        <div className="rounded-[32px] border border-slate-200/80 bg-white/95 px-8 py-7 text-slate-700 shadow-[0_30px_90px_rgba(15,23,42,0.12)]">
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-charcoal-dark">
+        <div className="rounded-[32px] border border-slate-200/80 dark:border-charcoal-light/20 bg-white/95 dark:bg-charcoal/50 px-8 py-7 text-slate-700 dark:text-slate-300 shadow-[0_30px_90px_rgba(15,23,42,0.12)]">
           <div className="flex items-center gap-4">
             <span className="neuro-loader neuro-loader-lg" aria-hidden="true" />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
                 Booting
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">Loading NeuroAI Pro</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">Loading NeuroAI Pro</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Restoring your session and preparing the workspace.
               </p>
             </div>
@@ -81,26 +82,28 @@ function App() {
 
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={token ? <Navigate to="/dashboard" replace /> : <Login onAuthSuccess={handleAuthSuccess} />}
-        />
-        <Route
-          path="/signup"
-          element={token ? <Navigate to="/dashboard" replace /> : <Signup onAuthSuccess={handleAuthSuccess} />}
-        />
-        <Route
-          path="/dashboard"
-          element={
-            token && user ? (
-              <Dashboard token={token} user={user} setUser={setUser} onLogout={logout} />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
-      </Routes>
+      <AppLayout user={user} onLogout={logout}>
+        <Routes>
+          <Route
+            path="/"
+            element={token ? <Navigate to="/dashboard" replace /> : <Login onAuthSuccess={handleAuthSuccess} />}
+          />
+          <Route
+            path="/signup"
+            element={token ? <Navigate to="/dashboard" replace /> : <Signup onAuthSuccess={handleAuthSuccess} />}
+          />
+          <Route
+            path="/dashboard"
+            element={
+              token && user ? (
+                <Dashboard token={token} user={user} setUser={setUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+        </Routes>
+      </AppLayout>
     </Router>
   )
 }

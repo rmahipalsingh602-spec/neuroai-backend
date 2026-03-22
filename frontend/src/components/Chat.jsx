@@ -65,16 +65,8 @@ export default function Chat({
   const voiceCacheRef = useRef(new Map())
   const voiceSessionRef = useRef(0)
   const isMountedRef = useRef(true)
-
-  // Auto-play voice for new AI responses
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage?.role === 'assistant' && !voiceActiveMessageId && !loading) {
-        handlePlayVoice(lastMessage)
-      }
-    }
-  }, [messages])
+  const autoPlayedMessageIdRef = useRef(null)
+  const handlePlayVoiceRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -146,12 +138,12 @@ export default function Chat({
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Speech Recognition not supported in your browser')
+      window.alert('Speech Recognition not supported in your browser')
       return
     }
 
     const recognition = new SpeechRecognition()
-    recognition.lang = navigator.language || 'en-US'
+    recognition.lang = window.navigator.language || 'en-US'
     recognition.continuous = false
     recognition.interimResults = false
 
@@ -393,6 +385,26 @@ export default function Chat({
     }
   }
 
+  handlePlayVoiceRef.current = handlePlayVoice
+
+  useEffect(() => {
+    if (!messages.length || voiceActiveMessageId || loading) {
+      return
+    }
+
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.role !== 'assistant') {
+      return
+    }
+
+    if (autoPlayedMessageIdRef.current === lastMessage.id) {
+      return
+    }
+
+    autoPlayedMessageIdRef.current = lastMessage.id
+    void handlePlayVoiceRef.current?.(lastMessage)
+  }, [loading, messages, voiceActiveMessageId])
+
   const getVoiceMetaLabel = (messageId) => {
     const meta = voiceMetaByMessageId[messageId]
     if (!meta) {
@@ -601,7 +613,7 @@ export default function Chat({
                       </p>
                       {message.sources.map((source) => (
                         <div
-                          key={\`\${message.id}-\${source.document_id}\`}
+                          key={`${message.id}-${source.document_id}`}
                           className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600"
                         >
                           <p className="font-semibold text-slate-700">{source.file_name}</p>

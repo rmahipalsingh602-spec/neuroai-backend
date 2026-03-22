@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 :root {
+  --primary-light: #3b82f6;
+  --primary-default: #2563eb;
+  --primary-dark: #1d4ed8;
+
   font-family: Aptos, "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  color: #0f172a;
-  background: #f8fafc;
 }
 
 html {
@@ -13,11 +15,11 @@ html {
 }
 
 body {
+  @apply bg-slate-50 text-slate-800;
+  @apply dark:bg-charcoal-dark dark:text-slate-300;
+  @apply transition-colors duration-300;
   margin: 0;
   min-width: 320px;
-  background:
-    radial-gradient(circle at top, rgba(251, 191, 36, 0.16), transparent 24%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 55%, #f8fafc 100%);
 }
 
 #root {
@@ -25,11 +27,12 @@ body {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
+  @apply bg-primary/20;
 }
 
+/* Redefine component base styles to be dark-mode aware */
 .message {
-  border-radius: 18px;
+  @apply rounded-xl;
 }
 
 .neuro-scrollbar::-webkit-scrollbar {
@@ -41,17 +44,13 @@ body {
 }
 
 .neuro-scrollbar::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background: rgba(148, 163, 184, 0.55);
+  @apply rounded-full bg-slate-400/50 dark:bg-slate-500/50;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .typing-dot {
-  height: 0.5rem;
-  width: 0.5rem;
-  border-radius: 9999px;
-  background: #2563eb;
+  @apply h-2 w-2 rounded-full bg-primary-light dark:bg-primary-dark;
   animation: neuroai-typing 1s infinite ease-in-out;
 }
 
@@ -64,28 +63,22 @@ body {
 }
 
 .neuro-loader {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  border: 3px solid rgba(148, 163, 184, 0.22);
-  border-top-color: #0f172a;
+  @apply inline-flex items-center justify-center rounded-full border-2;
+  @apply border-slate-200 border-t-slate-700;
+  @apply dark:border-charcoal-light dark:border-t-slate-300;
   animation: neuro-loader-spin 0.8s linear infinite;
 }
 
 .neuro-loader-sm {
-  height: 1rem;
-  width: 1rem;
+  @apply h-4 w-4;
 }
 
 .neuro-loader-md {
-  height: 1.35rem;
-  width: 1.35rem;
+  @apply h-6 w-6;
 }
 
 .neuro-loader-lg {
-  height: 3rem;
-  width: 3rem;
+  @apply h-12 w-12;
 }
 
 @keyframes neuroai-typing {

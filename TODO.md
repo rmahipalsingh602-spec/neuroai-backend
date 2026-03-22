@@ -1,32 +1,39 @@
-# Voice Input + Output System Implementation ✓
+# NeuroAI Platform Local Dev Setup - Fix API Error
 
-## Plan Breakdown (Approved: Add voice INPUT + auto-play OUTPUT to Chat.jsx)
+**Status: Proxy updated, backend deps ready, attempting backend start**
 
-### ✅ Step 1: Create TODO.md [COMPLETE]
+## Steps:
+**Status: Step 1 complete**
 
-### ✅ Step 2: Add voice input states and mic button to Chat.jsx
-- Added `[listening, setListening]`
-- Added `startListening()` fn with SpeechRecognition (navigator.language, auto-send)
-- Added styled mic button in input shell (red pulsing when listening, Tailwind, disabled states)
+## Steps:
 
-### ✅ Step 3: Implement auto-play for last AI response
-- Added useEffect on `messages` → auto `handlePlayVoice(last assistant msg)` (post-send)
-- Integrates with existing browser TTS + backend fallback, lang detect
+1. ✅ **Create this TODO.md**
 
-### ⏳ Step 4: Test changes
-- cd frontend && npm run dev
-- Test mic (allow perms) → speech → auto-send → auto voice out
-- Test Hindi/Eng switch, fallback, stop, errors
+2. **Install backend deps**  
+   `cd backend && pip install -r requirements.txt`
 
-### ⏳ Step 5: Update TODO.md on completion
-- Mark steps done
-- attempt_completion
+3. **Start Postgres**  
+   `docker-compose up -d postgres`
 
-**Changes complete in: frontend/src/components/Chat.jsx**
-- Full voice INPUT: Mic → speech-to-text → auto-send
-- Full voice OUTPUT: Auto-play AI responses + manual Play/Stop buttons
-- UX: Pro styles, loading, lang auto-detect (Hindi/Eng), browser/server fallback
-- Preserves all existing: chat history, limits, docs req, quick actions
+4. **Setup .env config**  
+   - Read backend/config.py  
+   - Create backend/.env (DB_URL, keys)
 
-**Ready for testing!**
+5. **Update Vite proxy**  
+   Edit frontend/vite.config.js → proxy target: 'http://localhost:8000'
 
+6. **Start backend**  
+   `cd backend && uvicorn main:app --reload --port 8000 --host 0.0.0.0`
+
+7. **Frontend dev** (if needed)  
+   `cd frontend && npm run dev`
+
+8. **Test** localhost:5173 dashboard/login
+
+9. ✅ **Mark complete**
+
+## Goal
+Fix API error by running local backend, bypass Render sleeping issue.
+
+Updated: [current time]
+# NeuroAI Platform Local Dev Setup - Fix API Error
