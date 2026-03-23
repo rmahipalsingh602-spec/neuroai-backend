@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
@@ -14,7 +15,12 @@ router = APIRouter()
 @router.get("/documents", response_model=DocumentListResponse)
 def list_documents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     documents = (
-        db.query(Document)
+        db.query(
+            Document.id,
+            Document.file_name,
+            func.substr(Document.content_text, 1, 180).label("content_preview"),
+            Document.created_at,
+        )
         .filter(Document.user_id == current_user.id)
         .order_by(Document.created_at.desc())
         .all()
@@ -24,7 +30,7 @@ def list_documents(current_user: User = Depends(get_current_user), db: Session =
             DocumentSummary(
                 id=document.id,
                 file_name=document.file_name,
-                content_preview=document.content_text[:180],
+                content_preview=document.content_preview,
                 created_at=document.created_at,
             )
             for document in documents

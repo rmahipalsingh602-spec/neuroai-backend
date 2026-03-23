@@ -7,7 +7,7 @@ from backend.errors import api_error
 from backend.models import Payment, User
 from backend.schemas import CreateOrderResponse, PaymentVerifyRequest, PaymentVerifyResponse
 from backend.services.payments import create_payment_order, verify_payment_signature
-from backend.services.usage import build_user_summary
+from backend.services.usage import build_user_summary_from_db
 
 router = APIRouter()
 
@@ -42,9 +42,5 @@ def verify_payment(
 
     return PaymentVerifyResponse(
         message="Payment verified successfully",
-        user=build_user_summary(
-            current_user,
-            document_count=len(current_user.documents),
-            payment_count=len(current_user.payments),
-        ),
+        user=build_user_summary_from_db(db, current_user),
     )

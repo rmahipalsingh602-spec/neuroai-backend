@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from backend.auth import (
@@ -14,20 +14,19 @@ from backend.database import get_db
 from backend.errors import api_error
 from backend.models import User
 from backend.schemas import AuthRequest, AuthResponse, LogoutRequest, RefreshSessionRequest, UserSummary
-from backend.services.usage import build_user_summary, refresh_usage_if_needed
+from backend.services.usage import build_user_summary_from_db, refresh_usage_if_needed
 
 router = APIRouter()
 
 
-def build_auth_response(user: User, refresh_token: str) -> AuthResponse:
+def build_auth_response(db: Session, user: User, refresh_token: str) -> AuthResponse:
     return AuthResponse(
         access_token=create_access_token(str(user.id)),
         refresh_token=refresh_token,
         token_type="bearer",
-        user=build_user_summary(
+        user=build_user_summary_from_db(
+            db,
             user,
-            document_count=len(user.documents),
-            payment_count=len(user.payments),
             has_seen_onboarding=user.has_seen_onboarding,
         ),
     )
@@ -47,7 +46,7 @@ def signup(payload: AuthRequest, db: Session = Depends(get_db)):
 
     refresh_token = issue_refresh_token(db, user)
     db.refresh(user)
-    return build_auth_response(user, refresh_token)
+    return build_auth_response(db, user, refresh_token)
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -59,7 +58,7 @@ def login(payload: AuthRequest, db: Session = Depends(get_db)):
     refresh_usage_if_needed(db, user)
     refresh_token = issue_refresh_token(db, user)
     db.refresh(user)
-    return build_auth_response(user, refresh_token)
+    return build_auth_response(db, user, refresh_token)
 
 
 @router.post("/refresh", response_model=AuthResponse)
@@ -67,7 +66,7 @@ def refresh_session(payload: RefreshSessionRequest, db: Session = Depends(get_db
     user, refresh_token = refresh_user_session(db, payload.refresh_token)
     refresh_usage_if_needed(db, user)
     db.refresh(user)
-    return build_auth_response(user, refresh_token)
+    return build_auth_response(db, user, refresh_token)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -79,11 +78,9 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserSummary)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     refresh_usage_if_needed(db, current_user)
-    db.refresh(current_user)
-    return build_user_summary(
+    return build_user_summary_from_db(
+        db,
         current_user,
-        document_count=len(current_user.documents),
-        payment_count=len(current_user.payments),
         has_seen_onboarding=current_user.has_seen_onboarding,
     )
 
@@ -93,10 +90,8 @@ def mark_onboarding_seen(current_user: User = Depends(get_current_user), db: Ses
     current_user.has_seen_onboarding = True
     db.add(current_user)
     db.commit()
-    db.refresh(current_user)
-    return build_user_summary(
+    return build_user_summary_from_db(
+        db,
         current_user,
-        document_count=len(current_user.documents),
-        payment_count=len(current_user.payments),
         has_seen_onboarding=True,
     )

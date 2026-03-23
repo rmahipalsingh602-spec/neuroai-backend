@@ -11,7 +11,13 @@ from backend.errors import api_error
 from backend.models import ChatMessage, Document, User
 from backend.schemas import ChatHistoryItem, ChatHistoryResponse, ChatRequest, ChatResponse, ChatSource
 from backend.services.ai import answer_question
-from backend.services.usage import build_user_summary, ensure_query_allowed, increment_usage, refresh_usage_if_needed
+from backend.services.usage import (
+    build_user_summary,
+    ensure_query_allowed,
+    get_user_payment_count,
+    increment_usage,
+    refresh_usage_if_needed,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -74,7 +80,7 @@ def chat(
             user=build_user_summary(
                 current_user,
                 document_count=len(documents),
-                payment_count=len(current_user.payments),
+                payment_count=get_user_payment_count(db, current_user.id),
             ),
         )
     except HTTPException:

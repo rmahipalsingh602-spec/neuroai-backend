@@ -1,11 +1,12 @@
 from datetime import date
 
-from fastapi import HTTPException, status
+from fastapi import status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.errors import api_error
-from backend.models import User
+from backend.models import Document, Payment, User
 from backend.schemas import UserSummary
 
 
@@ -42,6 +43,41 @@ def increment_usage(db: Session, user: User) -> User:
         db.add(user)
         db.flush()
     return user
+
+
+def get_user_asset_counts(db: Session, user_id: int) -> tuple[int, int]:
+    document_count = (
+        db.query(func.count(Document.id))
+        .filter(Document.user_id == user_id)
+        .scalar()
+        or 0
+    )
+    payment_count = (
+        db.query(func.count(Payment.id))
+        .filter(Payment.user_id == user_id)
+        .scalar()
+        or 0
+    )
+    return int(document_count), int(payment_count)
+
+
+def get_user_payment_count(db: Session, user_id: int) -> int:
+    _, payment_count = get_user_asset_counts(db, user_id)
+    return payment_count
+
+
+def build_user_summary_from_db(
+    db: Session,
+    user: User,
+    has_seen_onboarding: bool | None = None,
+) -> UserSummary:
+    document_count, payment_count = get_user_asset_counts(db, user.id)
+    return build_user_summary(
+        user,
+        document_count=document_count,
+        payment_count=payment_count,
+        has_seen_onboarding=has_seen_onboarding,
+    )
 
 
 def build_user_summary(user: User, document_count: int, payment_count: int, has_seen_onboarding: bool | None = None) -> UserSummary:
