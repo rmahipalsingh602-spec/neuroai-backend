@@ -4,6 +4,8 @@ const VOICE_REQUEST_TIMEOUT_MS = 45000
 const ACCESS_TOKEN_STORAGE_KEY = 'neuroai_access_token'
 const REFRESH_TOKEN_STORAGE_KEY = 'neuroai_refresh_token'
 const LEGACY_ACCESS_TOKEN_STORAGE_KEY = 'token'
+const USER_STORAGE_KEY = 'neuroai_cached_user'
+const DASHBOARD_CACHE_STORAGE_KEY = 'neuroai_dashboard_cache'
 
 function getStorage() {
   if (typeof window === 'undefined') {
@@ -11,6 +13,29 @@ function getStorage() {
   }
 
   return window.localStorage
+}
+
+function readStoredJson(key, fallback) {
+  const storage = getStorage()
+  const raw = storage?.getItem(key)
+  if (!raw) {
+    return fallback
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return fallback
+  }
+}
+
+function writeStoredJson(key, value) {
+  const storage = getStorage()
+  if (!storage) {
+    return
+  }
+
+  storage.setItem(key, JSON.stringify(value))
 }
 
 export function getStoredAccessToken() {
@@ -30,6 +55,34 @@ export function hasStoredSession() {
   return Boolean(getStoredAccessToken() || getStoredRefreshToken())
 }
 
+export function getCachedUser() {
+  return readStoredJson(USER_STORAGE_KEY, null)
+}
+
+export function persistCachedUser(user) {
+  if (!user) {
+    return user
+  }
+
+  writeStoredJson(USER_STORAGE_KEY, user)
+  return user
+}
+
+export function getCachedDashboard() {
+  const cachedDashboard = readStoredJson(DASHBOARD_CACHE_STORAGE_KEY, null)
+  return {
+    loaded: Boolean(cachedDashboard?.loaded),
+    documents: Array.isArray(cachedDashboard?.documents) ? cachedDashboard.documents : [],
+  }
+}
+
+export function persistDashboardCache({ documents }) {
+  writeStoredJson(DASHBOARD_CACHE_STORAGE_KEY, {
+    loaded: true,
+    documents: Array.isArray(documents) ? documents : [],
+  })
+}
+
 export function persistSession(authResponse) {
   const storage = getStorage()
   if (!storage || !authResponse) {
@@ -43,6 +96,9 @@ export function persistSession(authResponse) {
   if (authResponse.refresh_token) {
     storage.setItem(REFRESH_TOKEN_STORAGE_KEY, authResponse.refresh_token)
   }
+  if (authResponse.user) {
+    persistCachedUser(authResponse.user)
+  }
 
   return authResponse
 }
@@ -52,6 +108,8 @@ export function clearSession() {
   storage?.removeItem(ACCESS_TOKEN_STORAGE_KEY)
   storage?.removeItem(REFRESH_TOKEN_STORAGE_KEY)
   storage?.removeItem(LEGACY_ACCESS_TOKEN_STORAGE_KEY)
+  storage?.removeItem(USER_STORAGE_KEY)
+  storage?.removeItem(DASHBOARD_CACHE_STORAGE_KEY)
 }
 
 function buildHeaders({ token, headers = {}, isFormData = false } = {}) {
@@ -186,11 +244,14 @@ export function logoutSession() {
 }
 
 export function getMe(token) {
-  return request('/me', { token })
+  return request('/me', { token }).then((profile) => persistCachedUser(profile))
 }
 
 export function getDocuments(token) {
-  return request('/documents', { token })
+  return request('/documents', { token }).then((response) => {
+    persistDashboardCache({ documents: response.documents })
+    return response
+  })
 }
 
 export function getChatHistory(token) {
@@ -301,5 +362,5 @@ export function getAdminOverview(token) {
 }
 
 export function markOnboardingSeen(token) {
-  return request('/me/onboarding-seen', { method: 'POST', token })
+  return request('/me/onboarding-seen', { method: 'POST', token }).then((profile) => persistCachedUser(profile))
 }

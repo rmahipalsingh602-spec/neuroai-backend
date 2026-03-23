@@ -9,6 +9,7 @@ import PolicyPage from './components/PolicyPage.jsx'
 import { PRIVACY_POLICY, REFUND_POLICY, TERMS_POLICY } from './lib/policies.js'
 import {
   clearSession,
+  getCachedUser,
   getMe,
   getStoredAccessToken,
   hasStoredSession,
@@ -18,8 +19,8 @@ import {
 
 function App() {
   const [token, setToken] = useState(() => getStoredAccessToken())
-  const [user, setUser] = useState(null)
-  const [booting, setBooting] = useState(hasStoredSession())
+  const [user, setUser] = useState(() => getCachedUser())
+  const [booting, setBooting] = useState(() => hasStoredSession() && !getCachedUser())
 
   useEffect(() => {
     if (!hasStoredSession()) {

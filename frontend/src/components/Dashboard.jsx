@@ -4,10 +4,13 @@ import Chat from './Chat.jsx'
 import Upload from './Upload.jsx'
 import {
   createOrder,
+  getCachedDashboard,
   getAdminOverview,
   getDocuments,
   getMe,
   markOnboardingSeen,
+  persistCachedUser,
+  persistDashboardCache,
   verifyPayment,
 } from '../lib/api.js'
 import { openCheckout } from '../lib/razorpay.js'
@@ -81,16 +84,19 @@ function getTourCardStyle(targetRect) {
 }
 
 export default function Dashboard({ token, user, setUser, onLogout }) {
+  const cachedDashboard = getCachedDashboard()
   const [activeTab, setActiveTab] = useState('overview')
-  const [documents, setDocuments] = useState([])
+  const [documents, setDocuments] = useState(() => cachedDashboard.documents)
+  const [documentsLoaded, setDocumentsLoaded] = useState(() => cachedDashboard.loaded)
   const [adminOverview, setAdminOverview] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(() => !cachedDashboard.loaded)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [banner, setBanner] = useState('')
   const [error, setError] = useState('')
-  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => !user.has_seen_onboarding)
   const [currentStep, setCurrentStep] = useState(0)
   const [tourTargetRect, setTourTargetRect] = useState(null)
+  const resolvedDocumentCount = documentsLoaded ? documents.length : user.document_count
 
   const usagePercent = useMemo(() => {
     if (user.is_pro) return 100
@@ -105,23 +111,26 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
     let cancelled = false
 
     const loadDashboard = async () => {
-      setLoading(true)
+      setRefreshing(true)
       setError('')
 
       try {
-        const [profile, documentResponse] = await Promise.all([getMe(token), getDocuments(token)])
+        const requests = [getDocuments(token)]
+        if (user.is_admin) {
+          requests.push(getAdminOverview(token))
+        }
+
+        const [documentResponse, adminData] = await Promise.all(requests)
         if (cancelled) return
 
-        setUser(profile)
         setDocuments(documentResponse.documents)
-        setShowOnboarding(!profile.has_seen_onboarding)
+        setDocumentsLoaded(true)
+        persistDashboardCache({ documents: documentResponse.documents })
+        setShowOnboarding(!user.has_seen_onboarding)
         setCurrentStep(0)
 
-        if (profile.is_admin) {
-          const adminData = await getAdminOverview(token)
-          if (!cancelled) {
-            setAdminOverview(adminData)
-          }
+        if (user.is_admin && !cancelled) {
+          setAdminOverview(adminData)
         } else if (!cancelled) {
           setAdminOverview(null)
         }
@@ -131,16 +140,16 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
         }
       } finally {
         if (!cancelled) {
-          setLoading(false)
+          setRefreshing(false)
         }
       }
     }
 
-    loadDashboard()
+    void loadDashboard()
     return () => {
       cancelled = true
     }
-  }, [token, setUser])
+  }, [token, user.is_admin, user.has_seen_onboarding])
 
   useEffect(() => {
     if (!showOnboarding) {
@@ -192,9 +201,13 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
   const refreshProfile = async () => {
     const profile = await getMe(token)
     setUser(profile)
+    persistCachedUser(profile)
+    setShowOnboarding(!profile.has_seen_onboarding)
     if (profile.is_admin) {
       const adminData = await getAdminOverview(token)
       setAdminOverview(adminData)
+    } else {
+      setAdminOverview(null)
     }
     return profile
   }
@@ -209,6 +222,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
       const checkoutResponse = await openCheckout({ order, user })
       const verification = await verifyPayment(token, checkoutResponse)
       setUser(verification.user)
+      persistCachedUser(verification.user)
       setBanner('NeuroAI Pro activated successfully.')
       await refreshProfile()
     } catch (err) {
@@ -219,8 +233,20 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
   }
 
   const handleDocumentUploaded = (document) => {
-    setDocuments((current) => [document, ...current])
-    refreshProfile().catch(() => {})
+    setDocuments((current) => {
+      const nextDocuments = [document, ...current]
+      persistDashboardCache({ documents: nextDocuments })
+      return nextDocuments
+    })
+    setDocumentsLoaded(true)
+    setUser((currentUser) => {
+      const nextUser = {
+        ...currentUser,
+        document_count: currentUser.document_count + 1,
+      }
+      persistCachedUser(nextUser)
+      return nextUser
+    })
     setBanner(`${document.file_name} uploaded and indexed.`)
 
     if (showOnboarding && currentStep === 0) {
@@ -230,7 +256,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
 
   const handleUserUpdated = (nextUser) => {
     setUser(nextUser)
-    refreshProfile().catch(() => {})
+    persistCachedUser(nextUser)
   }
 
   const handleAuthError = () => {
@@ -252,6 +278,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
     try {
       const updatedUser = await markOnboardingSeen(token)
       setUser(updatedUser)
+      persistCachedUser(updatedUser)
     } catch (err) {
       setError(err.message || 'Could not save onboarding progress.')
     } finally {
@@ -305,7 +332,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
           <div className="grid gap-3 sm:grid-cols-3 xl:w-[460px]">
             <HeroStat label="Plan" value={user.is_pro ? 'Pro Active' : 'Free'} />
             <HeroStat label="Queries Left" value={user.is_pro ? 'Unlimited' : `${user.remaining_queries}`} />
-            <HeroStat label="Documents" value={`${documents.length}`} />
+            <HeroStat label="Documents" value={`${resolvedDocumentCount}`} />
           </div>
         </div>
       </section>
@@ -325,20 +352,20 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
           <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Current Focus</p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-              {documents.length ? 'Your workspace is ready.' : 'Start your AI journey.'}
+              {resolvedDocumentCount ? 'Your workspace is ready.' : 'Start your AI journey.'}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              {documents.length
+              {resolvedDocumentCount
                 ? 'Open AI Chat and use the smart starters to get your first answer quickly.'
                 : 'Upload your first document and unlock summaries, key points, and explanations.'}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => setActiveTab(documents.length ? 'chat' : 'documents')}
+                onClick={() => setActiveTab(resolvedDocumentCount ? 'chat' : 'documents')}
                 className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                {documents.length ? 'Open AI Chat' : 'Upload Now'}
+                {resolvedDocumentCount ? 'Open AI Chat' : 'Upload Now'}
               </button>
               {!user.is_pro ? (
                 <button
@@ -370,7 +397,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
 
   const renderDocuments = () => (
     <div className="space-y-6">
-      {!documents.length ? (
+      {documentsLoaded && !documents.length ? (
         <section className="rounded-[32px] border border-sky-100 bg-[linear-gradient(135deg,#eff6ff,#ffffff)] p-8 shadow-[0_24px_70px_rgba(59,130,246,0.08)]">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">No Document Yet</p>
           <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
@@ -392,6 +419,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
       <Upload
         token={token}
         documents={documents}
+        documentsLoaded={documentsLoaded}
         onDocumentUploaded={handleDocumentUploaded}
         onAuthError={handleAuthError}
         tourTargetId="upload-dropzone-cta"
@@ -433,7 +461,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
           <SettingRow label="Email" value={user.email} />
           <SettingRow label="Plan" value={user.is_pro ? 'NeuroAI Pro' : 'Free'} />
           <SettingRow label="Usage Month" value={user.usage_month} />
-          <SettingRow label="Documents Indexed" value={`${documents.length}`} />
+          <SettingRow label="Documents Indexed" value={`${resolvedDocumentCount}`} />
         </div>
       </div>
 
@@ -457,7 +485,7 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
         <Chat
           token={token}
           user={user}
-          documentCount={documents.length}
+          documentCount={resolvedDocumentCount}
           onUserUpdated={handleUserUpdated}
           onUpgrade={handleUpgrade}
           onAuthError={handleAuthError}
@@ -470,29 +498,6 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
     if (activeTab === 'usage') return renderUsage()
     if (activeTab === 'settings') return renderSettings()
     return renderOverview()
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#f8fafc,#eef2ff)]">
-        <div className="rounded-[32px] border border-slate-200/80 bg-white/95 px-8 py-7 text-slate-700 shadow-[0_30px_90px_rgba(15,23,42,0.12)]">
-          <div className="flex items-center gap-4">
-            <span className="neuro-loader neuro-loader-lg" aria-hidden="true" />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Loading Dashboard
-              </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">
-                Preparing your NeuroAI Pro workspace
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Fetching your profile, documents, and plan details.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -635,6 +640,11 @@ export default function Dashboard({ token, user, setUser, onLogout }) {
           {banner ? (
             <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {banner}
+            </div>
+          ) : null}
+          {refreshing ? (
+            <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+              Syncing your latest workspace data in the background...
             </div>
           ) : null}
           {error ? (

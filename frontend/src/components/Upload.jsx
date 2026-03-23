@@ -12,6 +12,7 @@ function getFileExtension(fileName) {
 export default function Upload({
   token,
   documents,
+  documentsLoaded = true,
   onDocumentUploaded,
   onAuthError,
   tourTargetId = 'upload-dropzone-cta',
@@ -185,6 +186,10 @@ export default function Upload({
               </li>
             ))}
           </ul>
+        ) : !documentsLoaded ? (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+            Syncing your saved documents...
+          </div>
         ) : (
           <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
             No documents uploaded yet. Start with your first file and NeuroAI will prepare it for chat.
