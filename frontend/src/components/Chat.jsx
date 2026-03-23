@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { generateVoiceAudio, sendChat } from '../lib/api.js'
+import { generateVoiceAudio, getChatHistory, sendChat } from '../lib/api.js'
 import {
   cacheVoiceAudio,
   createVoiceCacheKey,
-  detectVoiceLanguage,
   releaseVoiceCache,
+  resolveVoiceProfile,
   speakWithBrowserVoice,
   stopBrowserVoice,
 } from '../lib/voice.js'
@@ -37,8 +37,28 @@ const EXAMPLE_QUESTIONS = [
 const LANGUAGE_LABELS = {
   hi: 'Hindi',
   en: 'English',
-  fr: 'French',
-  es: 'Spanish',
+}
+
+const VOICE_LANGUAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto Detect' },
+  { value: 'hi', label: 'Hindi Voice' },
+  { value: 'en', label: 'English Voice' },
+]
+
+const VOICE_MODE_OPTIONS = [
+  { value: 'real', label: 'Real Voice' },
+  { value: 'browser', label: 'Fast Voice' },
+]
+
+const VOICE_LANGUAGE_STORAGE_KEY = 'neuroai_voice_language'
+const VOICE_MODE_STORAGE_KEY = 'neuroai_voice_mode'
+
+function readPreference(key, fallback) {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  return window.localStorage.getItem(key) || fallback
 }
 
 export default function Chat({
@@ -55,10 +75,18 @@ export default function Chat({
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyError, setHistoryError] = useState('')
   const [voiceActiveMessageId, setVoiceActiveMessageId] = useState(null)
   const [voiceMetaByMessageId, setVoiceMetaByMessageId] = useState({})
   const [voiceError, setVoiceError] = useState('')
   const [listening, setListening] = useState(false)
+  const [voiceLanguagePreference, setVoiceLanguagePreference] = useState(() =>
+    readPreference(VOICE_LANGUAGE_STORAGE_KEY, 'auto'),
+  )
+  const [voiceDeliveryMode, setVoiceDeliveryMode] = useState(() =>
+    readPreference(VOICE_MODE_STORAGE_KEY, 'real'),
+  )
   const bottomRef = useRef(null)
   const audioRef = useRef(null)
   const voiceAbortRef = useRef(null)
@@ -71,6 +99,58 @@ export default function Chat({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(VOICE_LANGUAGE_STORAGE_KEY, voiceLanguagePreference)
+    }
+  }, [voiceLanguagePreference])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(VOICE_MODE_STORAGE_KEY, voiceDeliveryMode)
+    }
+  }, [voiceDeliveryMode])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      setHistoryError('')
+
+      try {
+        const response = await getChatHistory(token)
+        if (cancelled) {
+          return
+        }
+
+        setMessages(response.messages)
+        const lastMessage = response.messages[response.messages.length - 1]
+        if (lastMessage?.role === 'assistant') {
+          autoPlayedMessageIdRef.current = lastMessage.id
+        }
+      } catch (err) {
+        if (err.code === 'AUTH_ERROR') {
+          onAuthError?.()
+          return
+        }
+
+        if (!cancelled) {
+          setHistoryError(err.message || 'Could not restore saved chat history.')
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false)
+        }
+      }
+    }
+
+    void loadHistory()
+    return () => {
+      cancelled = true
+    }
+  }, [token, onAuthError])
 
   useEffect(() => {
     const voiceCache = voiceCacheRef.current
@@ -92,7 +172,7 @@ export default function Chat({
   const isBlocked = !user.is_pro && user.usage_count >= user.usage_limit
   const hasDocuments = documentCount > 0
   const hasConversation = messages.some((message) => message.role === 'user')
-  const showWelcomeState = !hasConversation && messages.length === 0
+  const showWelcomeState = !historyLoading && !hasConversation && messages.length === 0
 
   const setVoiceMeta = (messageId, nextMeta) => {
     if (!isMountedRef.current) return
@@ -134,27 +214,31 @@ export default function Chat({
     return voiceSessionRef.current
   }
 
-  // 🎤 VOICE INPUT
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      window.alert('Speech Recognition not supported in your browser')
+      window.alert('Speech recognition is not supported in this browser.')
       return
     }
 
     const recognition = new SpeechRecognition()
-    recognition.lang = window.navigator.language || 'en-US'
+    recognition.lang = (
+      voiceLanguagePreference === 'hi'
+        ? 'hi-IN'
+        : voiceLanguagePreference === 'en'
+          ? 'en-IN'
+          : window.navigator.language || 'en-IN'
+    )
     recognition.continuous = false
     recognition.interimResults = false
 
     setListening(true)
-
     recognition.start()
 
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript
       setInput(text)
-      handleSend(text) // auto send
+      void handleSend(text)
     }
 
     recognition.onerror = () => {
@@ -186,6 +270,7 @@ export default function Chat({
       },
     ])
     setLoading(true)
+    setHistoryError('')
 
     try {
       const response = await sendChat(token, question)
@@ -255,7 +340,7 @@ export default function Chat({
     await audio.play()
   }
 
-  const playFallbackVoice = async (message, languageProfile, sessionId) => {
+  const playServerVoice = async (message, languageProfile, sessionId) => {
     const cacheKey = createVoiceCacheKey(message.content, languageProfile.outputLanguage)
     const cachedEntry = voiceCacheRef.current.get(cacheKey)
 
@@ -277,6 +362,7 @@ export default function Chat({
         message.content,
         languageProfile.outputLanguage,
         abortController.signal,
+        token,
       )
       if (abortController.signal.aborted || voiceSessionRef.current !== sessionId) {
         return
@@ -312,29 +398,9 @@ export default function Chat({
     }
   }
 
-  const handlePlayVoice = async (message) => {
-    if (!message.content?.trim()) return
-
-    if (voiceActiveMessageId === message.id) {
-      resetVoiceSession()
-      setVoiceError('')
-      return
-    }
-
-    const languageProfile = detectVoiceLanguage(message.content)
-    const sessionId = resetVoiceSession(false)
-
-    setVoiceError('')
-    if (isMountedRef.current) {
-      setVoiceActiveMessageId(message.id)
-    }
-    setVoiceMeta(message.id, {
-      sourceLanguage: languageProfile.sourceLanguage,
-      outputLanguage: languageProfile.outputLanguage,
-      mode: 'browser',
-    })
-
+  const startBrowserVoice = (message, languageProfile, sessionId, { fallbackToServer }) => {
     let browserStarted = false
+
     const browserPlayback = speakWithBrowserVoice(message.content, languageProfile, {
       onStart: () => {
         if (voiceSessionRef.current !== sessionId) return
@@ -352,14 +418,14 @@ export default function Chat({
       onError: (error) => {
         if (voiceSessionRef.current !== sessionId) return
 
-        if (!browserStarted) {
-          void playFallbackVoice(message, languageProfile, sessionId).catch((fallbackError) => {
-            if (fallbackError?.name === 'AbortError') {
+        if (!browserStarted && fallbackToServer) {
+          void playServerVoice(message, languageProfile, sessionId).catch((serverError) => {
+            if (serverError?.name === 'AbortError') {
               return
             }
 
-            globalThis.console.error('VOICE ERROR:', fallbackError)
-            failVoicePlayback(sessionId, fallbackError)
+            globalThis.console.error('VOICE ERROR:', serverError)
+            failVoicePlayback(sessionId, serverError)
           })
           return
         }
@@ -369,12 +435,60 @@ export default function Chat({
       },
     })
 
-    if (browserPlayback) {
+    return Boolean(browserPlayback)
+  }
+
+  const handlePlayVoice = async (message) => {
+    if (!message.content?.trim()) return
+
+    if (voiceActiveMessageId === message.id) {
+      resetVoiceSession()
+      setVoiceError('')
+      return
+    }
+
+    const languageProfile = resolveVoiceProfile(message.content, voiceLanguagePreference)
+    const sessionId = resetVoiceSession(false)
+
+    setVoiceError('')
+    if (isMountedRef.current) {
+      setVoiceActiveMessageId(message.id)
+    }
+    setVoiceMeta(message.id, {
+      sourceLanguage: languageProfile.sourceLanguage,
+      outputLanguage: languageProfile.outputLanguage,
+      mode: voiceDeliveryMode === 'real' ? 'server' : 'browser',
+    })
+
+    if (voiceDeliveryMode === 'real') {
+      try {
+        await playServerVoice(message, languageProfile, sessionId)
+        return
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return
+        }
+
+        globalThis.console.error('VOICE ERROR:', error)
+        const browserStarted = startBrowserVoice(message, languageProfile, sessionId, {
+          fallbackToServer: false,
+        })
+        if (!browserStarted) {
+          failVoicePlayback(sessionId, error)
+        }
+        return
+      }
+    }
+
+    const browserStarted = startBrowserVoice(message, languageProfile, sessionId, {
+      fallbackToServer: true,
+    })
+    if (browserStarted) {
       return
     }
 
     try {
-      await playFallbackVoice(message, languageProfile, sessionId)
+      await playServerVoice(message, languageProfile, sessionId)
     } catch (error) {
       if (error?.name === 'AbortError') {
         return
@@ -388,7 +502,7 @@ export default function Chat({
   handlePlayVoiceRef.current = handlePlayVoice
 
   useEffect(() => {
-    if (!messages.length || voiceActiveMessageId || loading) {
+    if (!messages.length || voiceActiveMessageId || loading || historyLoading) {
       return
     }
 
@@ -403,12 +517,16 @@ export default function Chat({
 
     autoPlayedMessageIdRef.current = lastMessage.id
     void handlePlayVoiceRef.current?.(lastMessage)
-  }, [loading, messages, voiceActiveMessageId])
+  }, [historyLoading, loading, messages, voiceActiveMessageId])
 
   const getVoiceMetaLabel = (messageId) => {
     const meta = voiceMetaByMessageId[messageId]
     if (!meta) {
-      return 'Auto-detect Hindi or English. Browser voice first, server fallback only when needed.'
+      return (
+        voiceLanguagePreference === 'auto'
+          ? 'Auto Hindi or English voice is ready for this message.'
+          : `${LANGUAGE_LABELS[voiceLanguagePreference]} voice preference is saved for this device.`
+      )
     }
 
     const sourceLabel = LANGUAGE_LABELS[meta.sourceLanguage] || 'detected language'
@@ -418,7 +536,7 @@ export default function Chat({
         ? 'browser voice'
         : meta.mode === 'cache'
           ? 'cached audio'
-          : 'fallback audio'
+          : 'real voice audio'
     )
 
     if (voiceActiveMessageId === messageId) {
@@ -436,8 +554,8 @@ export default function Chat({
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">AI Chat</p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-900">NeuroAI assistant</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Smart, fast, and helpful answers for your private documents with clear structure and
-              better follow-up prompts.
+              Smart, fast, and helpful answers for your private documents with clear structure,
+              saved chat history, and bilingual voice playback.
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
@@ -454,15 +572,39 @@ export default function Chat({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Voice Playback
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                <span className="rounded-full bg-white px-3 py-2 shadow-sm">Browser first</span>
-                <span className="rounded-full bg-white px-3 py-2 shadow-sm">Hindi auto</span>
-                <span className="rounded-full bg-white px-3 py-2 shadow-sm">English auto</span>
-                <span className="rounded-full bg-white px-3 py-2 shadow-sm">Server fallback</span>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Voice Language
+                  <select
+                    value={voiceLanguagePreference}
+                    onChange={(event) => setVoiceLanguagePreference(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700"
+                  >
+                    {VOICE_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Playback Mode
+                  <select
+                    value={voiceDeliveryMode}
+                    onChange={(event) => setVoiceDeliveryMode(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700"
+                  >
+                    {VOICE_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Instant playback uses native browser voice first. Backend audio runs only when the
-                browser cannot speak the message.
+              <p className="mt-3 text-xs text-slate-500">
+                Real Voice uses authenticated backend audio first. Fast Voice uses browser speech
+                first. Your Hindi and English preference is saved on this device.
               </p>
             </div>
           </div>
@@ -508,9 +650,24 @@ export default function Chat({
 
       <div className="chat-box flex h-[620px] flex-col bg-[linear-gradient(180deg,#f8fafc,#eef2ff)]">
         <div className="neuro-scrollbar flex-1 overflow-y-auto p-5">
+          {historyError ? (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {historyError}
+            </div>
+          ) : null}
+
           {voiceError ? (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               {voiceError}
+            </div>
+          ) : null}
+
+          {historyLoading ? (
+            <div className="mb-4 flex justify-start">
+              <div className="message inline-flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 shadow">
+                <span className="neuro-loader neuro-loader-sm" aria-hidden="true" />
+                <span className="text-sm text-slate-600">Restoring your saved conversation...</span>
+              </div>
             </div>
           ) : null}
 
@@ -689,24 +846,24 @@ export default function Chat({
             <div className="flex flex-1 flex-col gap-3 md:flex-row">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSend()
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void handleSend()
                   }
                 }}
                 placeholder={
                   hasDocuments
-                    ? 'Ask about any uploaded document... (or click 🎤)'
+                    ? 'Ask about any uploaded document... or use voice input.'
                     : 'Upload a document first to unlock AI answers...'
                 }
                 className="flex-1 rounded-2xl border border-gray-300 bg-white px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={loading || isBlocked || !hasDocuments}
               />
               <button
-                onClick={hasDocuments ? () => handleSend() : onOpenDocuments}
+                onClick={hasDocuments ? () => void handleSend() : onOpenDocuments}
                 disabled={loading || isBlocked || (hasDocuments && !input.trim())}
-                className="hidden md:inline-flex rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 w-full md:w-auto justify-center"
+                className="hidden w-full justify-center rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 md:inline-flex md:w-auto"
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
@@ -724,19 +881,22 @@ export default function Chat({
                 )}
               </button>
             </div>
-            {/* 🎤 MIC BUTTON */}
             <button
               onClick={startListening}
               disabled={loading || isBlocked || !hasDocuments || listening}
-              className={`rounded-full p-3 shadow-lg shadow-slate-900/25 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${listening ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-105 ring-2 ring-red-300/50' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/50 text-white'}`}
-              title={listening ? 'Listening...' : 'Speak now (auto Hindi/English)'}
+              className={`rounded-full p-3 text-white shadow-lg shadow-slate-900/25 transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 ${
+                listening
+                  ? 'scale-105 bg-red-500 ring-2 ring-red-300/50 shadow-lg shadow-red-500/50'
+                  : 'bg-slate-900 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/50'
+              }`}
+              title={listening ? 'Listening...' : 'Speak now in Hindi or English'}
             >
-              {listening ? '🎙️ Listening...' : '🎤 Speak'}
+              {listening ? 'Listening...' : 'Speak'}
             </button>
             <button
-              onClick={hasDocuments ? () => handleSend() : onOpenDocuments}
+              onClick={hasDocuments ? () => void handleSend() : onOpenDocuments}
               disabled={loading || isBlocked || (hasDocuments && !input.trim())}
-              className="md:hidden rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 w-full"
+              className="w-full rounded-2xl bg-primary px-6 py-3 font-semibold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -755,7 +915,7 @@ export default function Chat({
             </button>
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            NeuroAI responds clearly and uses bullet points when it helps. Voice input auto-detects Hindi/English.
+            NeuroAI saves your chat history and can reply with real Hindi or English voice.
           </p>
         </div>
       </div>

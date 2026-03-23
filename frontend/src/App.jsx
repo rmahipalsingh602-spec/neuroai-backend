@@ -5,17 +5,29 @@ import Login from './components/Login.jsx'
 import Signup from './components/Signup.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AppLayout from './components/AppLayout.jsx'
-import { getMe } from './lib/api.js'
+import PolicyPage from './components/PolicyPage.jsx'
+import { PRIVACY_POLICY, REFUND_POLICY, TERMS_POLICY } from './lib/policies.js'
+import {
+  clearSession,
+  getMe,
+  getStoredAccessToken,
+  hasStoredSession,
+  logoutSession,
+  persistSession,
+} from './lib/api.js'
 
 function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const [token, setToken] = useState(() => getStoredAccessToken())
   const [user, setUser] = useState(null)
-  const [booting, setBooting] = useState(Boolean(localStorage.getItem('token')))
+  const [booting, setBooting] = useState(hasStoredSession())
 
   useEffect(() => {
-    if (!token) {
+    if (!hasStoredSession()) {
       setUser(null)
       setBooting(false)
+      if (token) {
+        setToken('')
+      }
       return
     }
 
@@ -25,12 +37,13 @@ function App() {
       try {
         const profile = await getMe(token)
         if (!cancelled) {
+          setToken(getStoredAccessToken())
           setUser(profile)
         }
       } catch {
         if (!cancelled) {
-          localStorage.removeItem('token')
-          setToken(null)
+          clearSession()
+          setToken('')
           setUser(null)
         }
       } finally {
@@ -47,15 +60,15 @@ function App() {
   }, [token])
 
   const handleAuthSuccess = (authResponse) => {
-    localStorage.setItem('token', authResponse.access_token)
+    persistSession(authResponse)
     setToken(authResponse.access_token)
     setUser(authResponse.user)
     setBooting(false)
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
-    setToken(null)
+    void logoutSession()
+    setToken('')
     setUser(null)
   }
 
@@ -96,12 +109,15 @@ function App() {
             path="/dashboard"
             element={
               token && user ? (
-                <Dashboard token={token} user={user} setUser={setUser} />
+                <Dashboard token={token} user={user} setUser={setUser} onLogout={logout} />
               ) : (
                 <Navigate to="/" replace />
               )
             }
           />
+          <Route path="/privacy-policy" element={<PolicyPage policy={PRIVACY_POLICY} />} />
+          <Route path="/terms-and-conditions" element={<PolicyPage policy={TERMS_POLICY} />} />
+          <Route path="/refund-policy" element={<PolicyPage policy={REFUND_POLICY} />} />
         </Routes>
       </AppLayout>
     </Router>

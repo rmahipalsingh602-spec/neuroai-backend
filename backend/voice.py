@@ -5,21 +5,21 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import FileResponse
 from googletrans import Translator
 from gtts import gTTS
 from langdetect import DetectorFactory, LangDetectException, detect
 
+from backend.auth import get_current_user
 from backend.config import settings
 from backend.errors import api_error
+from backend.models import User
 from backend.schemas import VoiceRequest
 
 SUPPORTED_LANGUAGES = {
     "hi": "Hindi",
     "en": "English",
-    "fr": "French",
-    "es": "Spanish",
 }
 MAX_TEXT_LENGTH = 3000
 VOICE_CACHE_MAX_FILES = 200
@@ -155,11 +155,12 @@ def build_voice_audio(text: str, target_lang: str | None = None) -> VoiceResult:
         }
     },
 )
-def generate_voice(payload: VoiceRequest):
+def generate_voice(payload: VoiceRequest, current_user: User = Depends(get_current_user)):
     try:
         voice_result = build_voice_audio(payload.text, payload.target_lang)
         logger.info(
-            "[VOICE] Generated audio source_lang=%s output_lang=%s text_length=%s cache=%s",
+            "[VOICE] Generated audio user_id=%s source_lang=%s output_lang=%s text_length=%s cache=%s",
+            current_user.id,
             voice_result.source_language,
             voice_result.output_language,
             len(voice_result.spoken_text),

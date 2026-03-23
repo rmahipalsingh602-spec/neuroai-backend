@@ -1,5 +1,6 @@
-import ThemeToggle from './ThemeToggle';
-import logo from '../assets/logo.svg'; // Assuming you have a logo here
+import ThemeToggle from './ThemeToggle'
+import logo from '../assets/logo.svg'
+import PolicyLinks from './PolicyLinks.jsx'
 
 const AppLayout = ({ children, user, onLogout }) => {
   return (
@@ -28,8 +29,16 @@ const AppLayout = ({ children, user, onLogout }) => {
       <main className="flex-grow container mx-auto px-4 py-8">
         {children}
       </main>
+      <footer className="border-t border-slate-200/80 bg-white/70 px-4 py-5 dark:border-charcoal-light/20 dark:bg-charcoal-dark/70">
+        <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            NeuroAI keeps your login active, saves your workspace data, and provides clear policy access.
+          </p>
+          <PolicyLinks />
+        </div>
+      </footer>
     </div>
-  );
-};
+  )
+}
 
-export default AppLayout;
+export default AppLayout

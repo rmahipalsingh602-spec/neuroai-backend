@@ -23,6 +23,7 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./neuroai.db")
     secret_key: str = os.getenv("SECRET_KEY", "change-me-in-production")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    refresh_token_expire_days: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
     free_monthly_queries: int = int(os.getenv("FREE_MONTHLY_QUERIES", "10"))
     uploads_path: Path = Path(os.getenv("UPLOADS_PATH", "./uploads"))
     voice_temp_path: Path = Path(_default_voice_temp_path())

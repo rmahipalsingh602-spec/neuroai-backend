@@ -34,8 +34,33 @@ class UserSummary(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     user: UserSummary
+
+
+class RefreshSessionRequest(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=512)
+
+    @field_validator("refresh_token")
+    @classmethod
+    def validate_refresh_token(cls, value: str) -> str:
+        token = value.strip()
+        if not token:
+            raise ValueError("Refresh token is required")
+        return token
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=512)
+
+    @field_validator("refresh_token")
+    @classmethod
+    def validate_logout_refresh_token(cls, value: str) -> str:
+        token = value.strip()
+        if not token:
+            raise ValueError("Refresh token is required")
+        return token
 
 
 class DocumentSummary(BaseModel):
@@ -75,8 +100,8 @@ class VoiceRequest(BaseModel):
     @classmethod
     def validate_target_lang(cls, value: str) -> str:
         target_lang = value.strip().lower()
-        if target_lang not in {"hi", "en", "fr", "es"}:
-            raise ValueError("target_lang must be one of: hi, en, fr, es")
+        if target_lang not in {"hi", "en"}:
+            raise ValueError("target_lang must be one of: hi, en")
         return target_lang
 
 
@@ -84,6 +109,18 @@ class ChatSource(BaseModel):
     document_id: int
     file_name: str
     excerpt: str
+
+
+class ChatHistoryItem(BaseModel):
+    id: str
+    role: str
+    content: str
+    created_at: datetime
+    sources: List[ChatSource] = Field(default_factory=list)
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: List[ChatHistoryItem]
 
 
 class ChatResponse(BaseModel):

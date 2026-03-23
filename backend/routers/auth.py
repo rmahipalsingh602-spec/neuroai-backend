@@ -1,14 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.auth import authenticate_user, create_access_token, get_current_user, get_password_hash
+from backend.auth import (
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    issue_refresh_token,
+    refresh_user_session,
+    revoke_refresh_token,
+)
 from backend.database import get_db
 from backend.errors import api_error
 from backend.models import User
-from backend.schemas import AuthRequest, AuthResponse, UserSummary
+from backend.schemas import AuthRequest, AuthResponse, LogoutRequest, RefreshSessionRequest, UserSummary
 from backend.services.usage import build_user_summary, refresh_usage_if_needed
 
 router = APIRouter()
+
+
+def build_auth_response(user: User, refresh_token: str) -> AuthResponse:
+    return AuthResponse(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=build_user_summary(
+            user,
+            document_count=len(user.documents),
+            payment_count=len(user.payments),
+            has_seen_onboarding=user.has_seen_onboarding,
+        ),
+    )
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -23,12 +45,9 @@ def signup(payload: AuthRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    access_token = create_access_token(str(user.id))
-    return AuthResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=build_user_summary(user, document_count=0, payment_count=0, has_seen_onboarding=user.has_seen_onboarding),
-    )
+    refresh_token = issue_refresh_token(db, user)
+    db.refresh(user)
+    return build_auth_response(user, refresh_token)
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -38,12 +57,23 @@ def login(payload: AuthRequest, db: Session = Depends(get_db)):
         api_error(status.HTTP_401_UNAUTHORIZED, "AUTH_ERROR", "Incorrect email or password")
 
     refresh_usage_if_needed(db, user)
-    access_token = create_access_token(str(user.id))
-    return AuthResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=build_user_summary(user, len(user.documents), len(user.payments), has_seen_onboarding=user.has_seen_onboarding),
-    )
+    refresh_token = issue_refresh_token(db, user)
+    db.refresh(user)
+    return build_auth_response(user, refresh_token)
+
+
+@router.post("/refresh", response_model=AuthResponse)
+def refresh_session(payload: RefreshSessionRequest, db: Session = Depends(get_db)):
+    user, refresh_token = refresh_user_session(db, payload.refresh_token)
+    refresh_usage_if_needed(db, user)
+    db.refresh(user)
+    return build_auth_response(user, refresh_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(payload: LogoutRequest, db: Session = Depends(get_db)):
+    revoke_refresh_token(db, payload.refresh_token)
+    return None
 
 
 @router.get("/me", response_model=UserSummary)

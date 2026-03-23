@@ -8,7 +8,7 @@ from backend.auth import get_current_user
 from backend.database import get_db
 from backend.errors import api_error
 from backend.models import ChatMessage, Document, User
-from backend.schemas import ChatRequest, ChatResponse, ChatSource
+from backend.schemas import ChatHistoryItem, ChatHistoryResponse, ChatRequest, ChatResponse, ChatSource
 from backend.services.ai import answer_question
 from backend.services.usage import build_user_summary, ensure_query_allowed, increment_usage, refresh_usage_if_needed
 
@@ -90,3 +90,38 @@ def chat(
             "CHAT_ERROR",
             "Chat request failed. Check backend logs for the exact error.",
         )
+
+
+@router.get("/chat/history", response_model=ChatHistoryResponse)
+def chat_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    history_rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == current_user.id)
+        .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+        .all()
+    )
+
+    messages: list[ChatHistoryItem] = []
+    for row in history_rows:
+        messages.append(
+            ChatHistoryItem(
+                id=f"user-{row.id}",
+                role="user",
+                content=row.query,
+                created_at=row.created_at,
+            )
+        )
+        messages.append(
+            ChatHistoryItem(
+                id=f"assistant-{row.id}",
+                role="assistant",
+                content=row.response,
+                created_at=row.created_at,
+                sources=[],
+            )
+        )
+
+    return ChatHistoryResponse(messages=messages)

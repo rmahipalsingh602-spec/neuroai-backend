@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { login, signup } from '../lib/api.js'
+import PolicyLinks from './PolicyLinks.jsx'
 
 export default function Login({ onAuthSuccess, initialMode = 'login' }) {
   const [mode, setMode] = useState(initialMode)
@@ -126,6 +127,11 @@ export default function Login({ onAuthSuccess, initialMode = 'login' }) {
               )}
             </button>
           </form>
+
+          <p className="mt-4 text-xs leading-6 text-slate-500">
+            By continuing, you agree to the current NeuroAI platform policies and billing terms.
+          </p>
+          <PolicyLinks className="mt-3" />
 
           <p className="mt-6 text-sm text-slate-600">
             {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}

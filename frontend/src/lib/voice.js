@@ -49,6 +49,22 @@ export function detectVoiceLanguage(text = '') {
   }
 }
 
+export function resolveVoiceProfile(text = '', preferredLanguage = 'auto') {
+  const detectedProfile = detectVoiceLanguage(text)
+  const outputLanguage = preferredLanguage === 'auto'
+    ? detectedProfile.outputLanguage
+    : preferredLanguage === 'hi'
+      ? 'hi'
+      : 'en'
+
+  return {
+    ...detectedProfile,
+    isHindi: outputLanguage === 'hi',
+    locale: outputLanguage === 'hi' ? 'hi-IN' : 'en-US',
+    outputLanguage,
+  }
+}
+
 export function createVoiceCacheKey(text, outputLanguage) {
   return `${outputLanguage}:${normalizeVoiceText(text)}`
 }
