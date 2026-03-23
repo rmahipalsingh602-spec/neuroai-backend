@@ -17,17 +17,14 @@ function appendScript() {
 }
 
 export async function openCheckout({ order, user }) {
-  if (order.is_mock) {
-    return {
-      razorpay_order_id: order.order_id,
-      razorpay_payment_id: `pay_mock_${Date.now()}`,
-      razorpay_signature: 'mock_signature',
-    }
-  }
-
   await appendScript()
 
   return new Promise((resolve, reject) => {
+    if (!window.Razorpay) {
+      reject(new Error('Razorpay checkout is unavailable right now.'))
+      return
+    }
+
     const razorpay = new window.Razorpay({
       key: order.key_id,
       amount: order.amount,

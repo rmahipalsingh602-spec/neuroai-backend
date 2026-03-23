@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
+from backend.config import settings
 from backend.database import get_db
 from backend.errors import api_error
 from backend.models import ChatMessage, Document, User
@@ -39,7 +40,20 @@ def chat(
                 "Upload at least one document before starting AI chat.",
             )
 
-        answer, sources = answer_question(payload.query, documents)
+        recent_chat_rows = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.user_id == current_user.id)
+            .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+            .limit(settings.ai_history_turns)
+            .all()
+        )
+        recent_chat_rows.reverse()
+        chat_history: list[dict[str, str]] = []
+        for row in recent_chat_rows:
+            chat_history.append({"role": "user", "content": row.query})
+            chat_history.append({"role": "assistant", "content": row.response})
+
+        answer, sources = answer_question(payload.query, documents, chat_history=chat_history)
         increment_usage(db, current_user)
 
         chat_row = ChatMessage(user_id=current_user.id, query=payload.query, response=answer)

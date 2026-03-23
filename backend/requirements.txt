@@ -8,6 +8,9 @@ python-jose
 passlib[bcrypt]
 sqlalchemy
 openai
+groq
+python-docx
+requests
 gTTS
 langdetect
 googletrans==4.0.0-rc1

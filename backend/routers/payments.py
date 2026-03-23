@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from backend.auth import get_current_user
@@ -14,6 +14,8 @@ router = APIRouter()
 
 @router.post("/create-order", response_model=CreateOrderResponse)
 def create_order(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.is_pro:
+        api_error(status.HTTP_409_CONFLICT, "PAYMENT_ERROR", "NeuroAI Pro is already active on this account.")
     _, payload = create_payment_order(db, current_user)
     return CreateOrderResponse(**payload)
 
