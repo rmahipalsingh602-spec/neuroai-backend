@@ -1097,7 +1097,7 @@
             <a href="#feedback">Feedback</a>
             <a
               class="download-link"
-              href="https://neuroai-backend-0gl2.onrender.com/downloads/Rathore-PC-Tool-Setup.exe"
+              href="https://github.com/rmahipalsingh602-spec/neuroai-backend/releases/latest/download/Rathore-PC-Tool-Setup.exe"
               data-download-track
             >
               Download
@@ -1118,7 +1118,7 @@
             <div class="actions">
               <a
                 class="btn btn-primary"
-                href="https://neuroai-backend-0gl2.onrender.com/downloads/Rathore-PC-Tool-Setup.exe"
+                href="https://github.com/rmahipalsingh602-spec/neuroai-backend/releases/latest/download/Rathore-PC-Tool-Setup.exe"
                 data-download-track
               >
                 Download Now
@@ -1198,7 +1198,7 @@
               <a
                 class="btn btn-primary"
                 style="width:100%;"
-                href="https://neuroai-backend-0gl2.onrender.com/downloads/Rathore-PC-Tool-Setup.exe"
+                href="https://github.com/rmahipalsingh602-spec/neuroai-backend/releases/latest/download/Rathore-PC-Tool-Setup.exe"
                 data-download-track
               >
                 Big Download Button
@@ -1498,7 +1498,7 @@
             <div class="cta-actions">
               <a
                 class="btn btn-primary"
-                href="https://neuroai-backend-0gl2.onrender.com/downloads/Rathore-PC-Tool-Setup.exe"
+                href="https://github.com/rmahipalsingh602-spec/neuroai-backend/releases/latest/download/Rathore-PC-Tool-Setup.exe"
                 data-download-track
               >
                 Download Rathore PC Tool
@@ -1629,14 +1629,16 @@
         feature: 'New Feature',
         improvement: 'Improvement',
       }
-      const DEFAULT_API_BASE = 'https://neuroai-backend-0gl2.onrender.com'
-      const API_BASE = (
-        globalThis.PUBLIC_SITE_API_BASE
-        || (['localhost', '127.0.0.1'].includes(window.location.hostname)
-          ? 'http://127.0.0.1:8000'
-          : DEFAULT_API_BASE)
-      ).replace(/\/$/, '')
-      const DOWNLOAD_URL = `${API_BASE}/downloads/Rathore-PC-Tool-Setup.exe`
+      const DEFAULT_API_BASE = ''
+      const DEFAULT_DOWNLOAD_URL =
+        'https://github.com/rmahipalsingh602-spec/neuroai-backend/releases/latest/download/Rathore-PC-Tool-Setup.exe'
+      const API_BASE = (globalThis.PUBLIC_SITE_API_BASE || DEFAULT_API_BASE).replace(/\/$/, '')
+      const DOWNLOAD_URL = globalThis.PUBLIC_SITE_DOWNLOAD_URL || (
+        API_BASE
+          ? `${API_BASE}/downloads/Rathore-PC-Tool-Setup.exe`
+          : DEFAULT_DOWNLOAD_URL
+      )
+      const HAS_LIVE_BACKEND = Boolean(API_BASE)
       let siteSnapshot = null
 
       function formatNumber(value) {
@@ -1664,6 +1666,10 @@
       }
 
       async function apiRequest(path, options = {}) {
+        if (!API_BASE) {
+          throw new Error('Live backend is disabled for this static site.')
+        }
+
         const headers = options.body
           ? { 'Content-Type': 'application/json', ...(options.headers || {}) }
           : options.headers || {}
@@ -1843,6 +1849,15 @@
       }
 
       async function loadSiteSnapshot() {
+        if (!HAS_LIVE_BACKEND) {
+          const feed = document.getElementById('activity-feed')
+          if (feed) {
+            feed.innerHTML =
+              '<li><span class="pulse-dot"></span><span class="activity-text">Static mode is active. Download works directly, but live stats, reviews, and feedback need a backend.</span></li>'
+          }
+          return
+        }
+
         try {
           const snapshot = await apiRequest('/public/site-stats')
           renderSiteSnapshot(snapshot)
@@ -1884,6 +1899,10 @@
 
       document.querySelectorAll('[data-download-track]').forEach((link) => {
         link.href = DOWNLOAD_URL
+        if (!HAS_LIVE_BACKEND) {
+          return
+        }
+
         link.addEventListener('click', () => {
           void apiRequest('/public/site-download', {
             method: 'POST',
@@ -1903,7 +1922,19 @@
       const feedbackForm = document.getElementById('feedback-form')
       const feedbackStatus = document.getElementById('feedback-status')
 
-      if (reviewForm) {
+      if (!HAS_LIVE_BACKEND) {
+        if (reviewStatus) {
+          reviewStatus.textContent =
+            'Static mode: review submission needs a backend connection.'
+        }
+
+        if (feedbackStatus) {
+          feedbackStatus.textContent =
+            'Static mode: feedback submission needs a backend connection.'
+        }
+      }
+
+      if (reviewForm && HAS_LIVE_BACKEND) {
         reviewForm.addEventListener('submit', async (event) => {
           event.preventDefault()
 
@@ -1936,7 +1967,7 @@
         })
       }
 
-      if (feedbackForm) {
+      if (feedbackForm && HAS_LIVE_BACKEND) {
         feedbackForm.addEventListener('submit', async (event) => {
           event.preventDefault()
 
